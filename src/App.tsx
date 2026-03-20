@@ -5,7 +5,9 @@ import { redistributeAllocations } from './lib/constraintEngine'
 import { useAnimatedNumber, usePersistedState } from './lib/hooks'
 import { AllocationTable } from './components/AllocationTable'
 import { RingHealthGauge } from './components/RingHealthGauge'
-import { ChevronLeft, ChevronRight, Copy, ClipboardCopy, Star, Lock, CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, ClipboardCopy, Star, Lock, CheckCircle2, Cloud, CloudOff } from 'lucide-react'
+import { loadFromSheet, debouncedSaveWeek, saveTeamToSheet, saveOpportunitiesToSheet, lockInToSheet, setSyncStatusCallback, isSheetConfigured } from './lib/sheetSync'
+import type { SyncStatus } from './lib/sheetSync'
 
 export function App() {
   const [team, setTeam] = usePersistedState<TeamMember[]>('team', DEFAULT_TEAM)
@@ -16,12 +18,35 @@ export function App() {
   const [mode, setMode] = usePersistedState<AllocMode>('mode', 'plan')
   const [flashedCells, setFlashedCells] = useState<CellKey[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(isSheetConfigured() ? 'idle' : 'offline')
+
+  // Sheet sync: register status callback
+  useEffect(() => {
+    setSyncStatusCallback(setSyncStatus)
+  }, [])
+
+  // Sheet sync: load on first render
+  useEffect(() => {
+    if (!isSheetConfigured()) return
+    loadFromSheet().then(data => {
+      if (!data) { setSyncStatus('offline'); return }
+      if (data.team?.length) setTeam(data.team)
+      if (data.opportunities?.length) setOpportunities(data.opportunities)
+      setSyncStatus('saved')
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const weekIdx = weeks.findIndex(w => w.id === weekId)
   const currentWeek = weeks[weekIdx] || weeks[0]
   const prevWeek = weekIdx > 0 ? weeks[weekIdx - 1] : null
 
   useEffect(() => { if (weekIdx > 0) setWeeks(prev => autoFillWeek(prev, weekIdx)) }, [weekIdx])
+
+  // Sheet sync: debounced save when current week changes
+  useEffect(() => {
+    if (!isSheetConfigured() || !currentWeek) return
+    debouncedSaveWeek(currentWeek.id, currentWeek.label, currentWeek.allocations, team, currentWeek.demandGen)
+  }, [currentWeek?.allocations, currentWeek?.demandGen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const weekHistory = useMemo(() => weeks.slice(Math.max(0, weekIdx - 3), weekIdx + 1).map(w => w.allocations), [weeks, weekIdx])
 
@@ -33,6 +58,7 @@ export function App() {
     for (const m of newTeam.filter(m => !oldIds.has(m.id))) w = addMemberToWeeks(w, m.id)
     for (const m of team.filter(m => !newIds.has(m.id))) w = removeMemberFromWeeks(w, m.id)
     setWeeks(w); setTeam(newTeam)
+    saveTeamToSheet(newTeam)
     flash(`Team: ${newTeam.map(m => m.name).join(', ')}`)
   }, [team, weeks, setWeeks, setTeam])
 
@@ -42,6 +68,7 @@ export function App() {
     for (const o of newOpps.filter(o => !oldIds.has(o.id))) w = addOppToWeeks(w, o.id, team)
     for (const o of opportunities.filter(o => !newIds.has(o.id))) w = removeOppFromWeeks(w, o.id)
     setWeeks(w); setOpportunities(newOpps)
+    saveOpportunitiesToSheet(newOpps)
     flash('Opportunities updated')
   }, [opportunities, weeks, team, setWeeks, setOpportunities])
 
@@ -80,6 +107,7 @@ export function App() {
   const handleLockIn = () => {
     const summary = generateLockSummary(currentWeek, prevWeek, opportunities, team)
     setWeeks(prev => prev.map(w => w.id !== weekId ? w : { ...w, lockedIn: true, lockSummary: summary }))
+    lockInToSheet(currentWeek.label, summary)
     navigator.clipboard.writeText(summary).then(() => flash('Locked & copied to clipboard!')).catch(() => flash('Week locked in!'))
   }
 
@@ -154,6 +182,12 @@ export function App() {
           <div className="flex items-center gap-1.5">
             <button onClick={handleCopyLastWeek} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded active:scale-95"><Copy size={13} /> Copy</button>
             <button onClick={handleExport} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded active:scale-95"><ClipboardCopy size={13} /> Export</button>
+            {isSheetConfigured() && (
+              <span className={`flex items-center gap-1 text-[10px] font-medium ${syncStatus === 'saved' ? 'text-emerald-500' : syncStatus === 'syncing' ? 'text-amber-500' : syncStatus === 'error' ? 'text-red-500' : 'text-slate-400'}`}>
+                {syncStatus === 'offline' ? <CloudOff size={12} /> : <Cloud size={12} />}
+                {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'saved' ? 'Saved' : syncStatus === 'error' ? 'Error' : ''}
+              </span>
+            )}
             <button onClick={handleLockIn} disabled={currentWeek.lockedIn}
               className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded shadow-sm transition-all active:scale-95 ${currentWeek.lockedIn ? 'bg-forest/20 text-forest cursor-default' : 'bg-forest hover:bg-forest-dark text-white'}`}>
               <Lock size={13} /> {currentWeek.lockedIn ? 'Locked' : 'Lock In'}
