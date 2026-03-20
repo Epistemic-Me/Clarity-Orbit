@@ -35,9 +35,9 @@
 | **Cash Flow Waterfall** | ✅ Complete | Dayforce collections lagged Net-30 (references P&L row 12, offset 1 month). Mystica/Agency = same month (references P&L rows 13+14+15). Sprint Zero = same month (P&L row 16). TOTAL CASH IN = SUM. TOTAL CASH OUT = P&L COGS + OPEX. NET CASH FLOW = In - Out. ENDING BALANCE = Starting + Net. Starting Balance = prior month's Ending. MONTHS OF RUNWAY = Balance / Cash Out. |
 | **Sales Pipeline** | ✅ Complete | Annual $ = Monthly × 12. Weighted $ = Annual × Probability. Total Pipeline = SUM(Annual). Weighted Pipeline = SUM(Weighted). Closed Won = SUMPRODUCT where prob=1. |
 
-## What STILL Needs Formulas (the work for PR #2)
+## What Was Rebuilt With Formulas (COMPLETED in this session)
 
-### LRP (5-Year) — HIGH PRIORITY
+### LRP (5-Year) — ✅ DONE
 **Reference**: Excel rows 22-39
 - `PEPM Gross Revenue` = Rate × Customers × Avg Employees × 12 (row 24)
 - `PEPM Profit Share` = PEPM Gross × Profit Share % (row 25)
@@ -51,12 +51,12 @@
 - `Revenue Mix %` = segment / total (rows 38-39)
 - **All assumption cells (rows 7-20) are INPUTS; all revenue cells (rows 22-39) are FORMULAS**
 
-### IRR by Channel — MEDIUM PRIORITY
+### IRR by Channel — ✅ DONE
 - `Total Investment` = Hours × Blended Rate (row 7)
 - `Simple ROI` = Annual Revenue / Investment (row 11)
 - Hours, Rate, Monthly Revenue, Annual Revenue are INPUTS
 
-### LTV Model — MEDIUM PRIORITY
+### LTV Model — ✅ DONE
 - `Monthly Gross Profit` = Revenue - COGS (row 14)
 - `Gross Margin %` = GP / Revenue (row 15)
 - `Simple LTV` = GP × Lifetime (row 16)
@@ -66,7 +66,7 @@
 - `Churn-Adjusted LTV` = GP / Churn Rate (row 20)
 - All unit economics assumptions (rows 5-11) are INPUTS
 
-### Resource Allocation — MEDIUM PRIORITY
+### Resource Allocation — ✅ DONE
 - `Robert Hours` = Robert % × Robert Monthly Hours (row 18)
 - `Jonathan Hours` = Jonathan % × Jonathan Monthly Hours (row 19)
 - `QA Hours` = QA % × QA Monthly Hours (row 20)
@@ -77,14 +77,14 @@
 - `Months to Milestone` = Hours to Milestone / Monthly Hours allocated
 - Percentage cells (rows 13-15) are INPUTS; hours and aggregates are FORMULAS
 
-### Expense Detail — LOW PRIORITY
+### Expense Detail — ✅ DONE
 - `Total Personnel` = SUM of personnel rows (row 10)
 - `Total Tooling` = SUM of tooling rows (row 22)
 - `TOTAL MONTHLY EXPENSES` = Personnel + Tooling (row 24)
 - `Annual Total` column = SUM across months
 - Individual line items are INPUTS
 
-### Runway & KPIs — LOW PRIORITY
+### Runway & KPIs — ✅ DONE
 - `MONTHS OF RUNWAY` = Cash Balance / Net Burn (or ∞ if positive)
 - `NET CASH POSITION` = Cash + AR - AP - CC Outstanding
 - `ARR` = MRR × 12
