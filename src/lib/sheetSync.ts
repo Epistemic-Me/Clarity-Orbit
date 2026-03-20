@@ -130,3 +130,34 @@ export function debouncedSaveWeek(
 export function isSheetConfigured(): boolean {
   return isConfigured()
 }
+
+// ============== REFRESH ==============
+
+let refreshCallback: ((data: SheetState) => void) | null = null
+
+export function setRefreshCallback(cb: (data: SheetState) => void) {
+  refreshCallback = cb
+}
+
+export async function refreshFromSheet(): Promise<boolean> {
+  if (!isConfigured()) return false
+  updateStatus('syncing')
+  const data = await loadFromSheet()
+  if (data && refreshCallback) {
+    refreshCallback(data)
+    updateStatus('saved')
+    return true
+  }
+  updateStatus('error')
+  return false
+}
+
+// Auto-refresh when window regains focus (if configured)
+let focusRefreshEnabled = false
+export function enableFocusRefresh() {
+  if (focusRefreshEnabled) return
+  focusRefreshEnabled = true
+  window.addEventListener('focus', () => {
+    if (isConfigured()) refreshFromSheet()
+  })
+}
