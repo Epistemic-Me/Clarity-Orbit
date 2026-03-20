@@ -25,3 +25,4 @@ dist-ssr
 
 # Keep data/ tracked
 !data/
+.vercel
