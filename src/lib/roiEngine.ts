@@ -12,25 +12,45 @@
 
 import type { Opportunity, ROIResult } from './types'
 
-const DISCOUNT_RATE = 0.03 // 3% monthly = ~36% annual
-const COST_PER_HOUR = 150 // Loaded cost per hour
-const CURRENT_MONTH_INDEX = 8 // 0-indexed: 8 = Mar'26 (Jul'25 = 0)
 const WEEKS_PER_MONTH = 4.3
+
+// Defaults — can be overridden via ROI config from Sheet
+let DISCOUNT_RATE = 0.03
+let COST_PER_HOUR = 150
+
+// Auto-calculate: months since Jul'25 (month 0)
+function getCurrentMonthIndex(): number {
+  const now = new Date()
+  const baseYear = 2025
+  const baseMonth = 6 // July = 6 (0-indexed)
+  return (now.getFullYear() - baseYear) * 12 + (now.getMonth() - baseMonth)
+}
+
+// Allow Sheet to override defaults
+export function setROIConfig(config: { discountRate?: number; costPerHour?: number }) {
+  if (config.discountRate !== undefined) DISCOUNT_RATE = config.discountRate
+  if (config.costPerHour !== undefined) COST_PER_HOUR = config.costPerHour
+}
+
+export function getROIConfig() {
+  return { discountRate: DISCOUNT_RATE, costPerHour: COST_PER_HOUR, currentMonthIndex: getCurrentMonthIndex() }
+}
 
 export function calculateROI(opp: Opportunity): ROIResult {
   const rev = opp.monthlyRevenue || []
   const hrs = opp.weeklyHours || []
   const confidence = opp.confidence || 0
+  const currentMonth = getCurrentMonthIndex()
 
   // Step 1: Sum future revenue (months >= current)
   let undiscountedRev = 0
   let discountedNPV = 0
   let remainingWeeklyHours = 0
 
-  for (let i = CURRENT_MONTH_INDEX; i < 18; i++) {
+  for (let i = currentMonth; i < 18; i++) {
     const monthRev = rev[i] || 0
     const monthHrs = hrs[i] || 0
-    const monthsFromNow = i - CURRENT_MONTH_INDEX
+    const monthsFromNow = i - currentMonth
 
     // Step 1
     undiscountedRev += monthRev
