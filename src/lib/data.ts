@@ -13,17 +13,24 @@ export const DEFAULT_TEAM: TeamMember[] = [
   { id: 'qa', name: 'QA', capacity: 15, rate: 75 },
 ]
 
+// Monthly revenue forecast: 18 months Jul'25 → Dec'26
+// Monthly hours forecast: 18 months Jul'25 → Dec'26 (hrs/wk per month)
 export const DEFAULT_OPPORTUNITIES: Opportunity[] = [
-  { id: 'opp-3', name: 'Clarity Growth', ring: 'inner', isApi: true, notes: 'Target MRR $5K, 6mo to revenue.', milestone: { done: 30, total: 150 }, targetDate: '2026-06-30' },
-  { id: 'opp-4', name: 'Clarity Builder', ring: 'inner', isApi: true, notes: 'Target MRR $8K, 5mo to revenue.', milestone: { done: 30, total: 200 }, targetDate: '2026-05-15' },
-  { id: 'opp-1', name: 'Dayforce / Surveys+', ring: 'middle', isApi: true, notes: '$25K/mo contract, PEPM $37,500.', milestone: { done: 40, total: 340 }, revenueLabel: '$25K/mo', targetDate: '2026-07-01' },
-  { id: 'opp-2', name: 'Mystica — Clarity Features', ring: 'middle', isApi: true, notes: '$13K/mo retainer.', milestone: { done: 30, total: 200 }, revenueLabel: '$13K/mo', targetDate: '2026-06-01' },
-  { id: 'opp-5', name: 'Mystica — Maintenance', ring: 'outer', isApi: false, notes: 'CAP at 2h/week!', capPerWeek: 2 },
-  { id: 'opp-6', name: 'Intapp', ring: 'outer', isApi: false, notes: 'Discovery. 2,700 firms. 35% prob.' },
-  { id: 'opp-7', name: 'SEO / Blog Engine', ring: 'outer', isApi: false, notes: 'Auto-generated daily.' },
-  { id: 'opp-8', name: 'Weekly Newsletter', ring: 'outer', isApi: false, notes: 'Nurture sequence.' },
-  { id: 'opp-9', name: 'Weekly Podcast', ring: 'outer', isApi: false, notes: 'AI founder interviews.' },
-  { id: 'opp-10', name: 'Shorts / Social Media', ring: 'outer', isApi: false, notes: '$4K/mo agency.' },
+  { id: 'opp-3', name: 'Clarity Growth', ring: 'inner', isApi: true, notes: 'Target MRR $5K, 6mo to revenue.', milestone: { done: 30, total: 150 }, targetDate: '2026-06-30', confidence: 0.25,
+    monthlyRevenue: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], weeklyHours: [0,0,0,5,5,5,8,8,8,8,8,8,8,8,8,8,8,8] },
+  { id: 'opp-4', name: 'Clarity Builder', ring: 'inner', isApi: true, notes: 'Target MRR $8K, 5mo to revenue.', milestone: { done: 30, total: 200 }, targetDate: '2026-05-15', confidence: 0.25,
+    monthlyRevenue: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], weeklyHours: [0,0,0,5,5,5,8,8,8,8,8,8,8,8,8,8,8,8] },
+  { id: 'opp-1', name: 'Dayforce / Surveys+', ring: 'middle', isApi: true, notes: '$25K/mo contract, PEPM $37,500.', milestone: { done: 40, total: 340 }, revenueLabel: '$25K/mo', targetDate: '2026-07-01', confidence: 0.9,
+    monthlyRevenue: [0,0,0,0,0,0,25000,25000,25000,25000,25000,25000,25000,27500,30000,32500,35000,40000], weeklyHours: [0,0,0,0,0,0,20,20,20,18,18,18,15,15,15,12,12,12] },
+  { id: 'opp-2', name: 'Mystica — Clarity Features', ring: 'middle', isApi: true, notes: '$13K/mo retainer.', milestone: { done: 30, total: 200 }, revenueLabel: '$13K/mo', targetDate: '2026-06-01', confidence: 0.85,
+    monthlyRevenue: [0,0,0,0,19628,19498,20718,21293,21000,21000,21000,21000,21000,21000,21000,21000,21000,21000], weeklyHours: [0,0,0,0,20,20,20,18,18,18,18,18,15,15,15,15,15,15] },
+  { id: 'opp-5', name: 'Mystica — Maintenance', ring: 'outer', isApi: false, notes: 'CAP at 2h/week!', capPerWeek: 2, confidence: 0.85 },
+  { id: 'opp-6', name: 'Intapp', ring: 'outer', isApi: false, notes: 'Discovery. 2,700 firms. 35% prob.', confidence: 0.15,
+    monthlyRevenue: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000], weeklyHours: [0,0,0,0,0,0,0,0,5,5,5,5,5,5,5,5,5,5] },
+  { id: 'opp-7', name: 'SEO / Blog Engine', ring: 'outer', isApi: false, notes: 'Auto-generated daily.', confidence: 0 },
+  { id: 'opp-8', name: 'Weekly Newsletter', ring: 'outer', isApi: false, notes: 'Nurture sequence.', confidence: 0 },
+  { id: 'opp-9', name: 'Weekly Podcast', ring: 'outer', isApi: false, notes: 'AI founder interviews.', confidence: 0 },
+  { id: 'opp-10', name: 'Shorts / Social Media', ring: 'outer', isApi: false, notes: '$4K/mo agency.', confidence: 0 },
 ]
 
 function emptyAlloc(team: TeamMember[]): Allocation {

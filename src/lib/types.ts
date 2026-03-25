@@ -19,6 +19,18 @@ export interface Opportunity {
   targetDate?: string
   revenueLabel?: string
   capPerWeek?: number
+  confidence: number // 0.0 - 1.0, execution probability
+  monthlyRevenue?: number[] // 18-month revenue forecast (Jul'25 → Dec'26)
+  weeklyHours?: number[] // 18-month hours forecast
+}
+
+export interface ROIResult {
+  undiscountedRev: number
+  discountedNPV: number
+  riskAdjNPV: number
+  remainingHours: number
+  vph: number // value per hour
+  roiMultiple: number // VPH / cost per hour
 }
 
 export interface DemandGen {
