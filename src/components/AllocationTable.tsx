@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import type { Opportunity, Allocation, DemandGen, CellKey, RingType, TeamMember, AllocMode } from '../lib/types'
 import { RING_COLORS, RING_META } from '../lib/data'
 import { getPersonSummary } from '../lib/constraintEngine'
+import { calculateROI, roiColor, formatROI, formatVPH, calculatePortfolioROI } from '../lib/roiEngine'
 import { ArrowRight, Link, Unlink, Terminal, Users, Plus, Trash, X, Settings } from 'lucide-react'
 
 interface Props {
@@ -107,7 +108,7 @@ function OppEditor({ opps, onSave, onClose }: { opps: Opportunity[]; onSave: (o:
   const add = () => {
     if (!nn.trim()) return
     const id = `opp-${Date.now()}`
-    setD([...d, { id, name: nn.trim(), ring: nr, isApi: nr !== 'outer', notes: '' }])
+    setD([...d, { id, name: nn.trim(), ring: nr, isApi: nr !== 'outer', notes: '', confidence: 0 }])
     setNN('')
   }
   return (
@@ -232,7 +233,7 @@ export function AllocationTable({
         {!first && <div className="h-3" />}
         <div className={`flex items-center h-10 px-4 ${s.hdr} border-y border-slate-100/80`}>
           <div className="flex-1 flex items-center gap-2.5"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: RING_COLORS[ring] }} /><span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{meta.label}</span></div>
-          <div className="flex items-center gap-6 text-xs font-mono"><span className="font-bold text-slate-600">{h}h</span><span className="text-slate-400">${cost.toLocaleString()}</span><span className="w-48 text-right text-forest font-bold text-[12px]">{proj}</span></div>
+          <div className="flex items-center gap-6 text-xs font-mono"><span className="font-bold text-slate-600">{h}h</span><span className="text-slate-400">${cost.toLocaleString()}</span>{(() => { const portfolio = calculatePortfolioROI(opps); const ringR = portfolio.ringROI[ring]; return ringR ? <span className={`w-14 text-right font-bold ${roiColor(ringR.roi)}`}>{formatROI(ringR.roi)}</span> : null })()}<span className="w-48 text-right text-forest font-bold text-[12px]">{proj}</span></div>
         </div>
         {opps.map((opp, idx) => {
           const a = allocations[opp.id]?.[mode] || {}, rowT = team.reduce((ss, m) => ss + (a[m.id] || 0), 0)
@@ -266,6 +267,11 @@ export function AllocationTable({
               <div className="flex items-center gap-5 text-sm font-mono">
                 <span className={`w-10 text-right font-bold ${rowT > 0 ? 'text-slate-800' : 'text-slate-300'}`}>{rowT}h</span>
                 <span className="w-16 text-right text-slate-400 text-xs">{rowCost > 0 ? `$${rowCost.toLocaleString()}` : '—'}</span>
+                {(() => { const roi = calculateROI(opp); const conf = opp.confidence || 0; return (
+                  <span className={`w-14 text-right text-xs font-bold ${roiColor(roi.roiMultiple)}`} title={`VPH: ${formatVPH(roi.vph)} | NPV: $${Math.round(roi.riskAdjNPV/1000)}K | Conf: ${Math.round(conf*100)}%`}>
+                    {formatROI(roi.roiMultiple)}
+                  </span>
+                ) })()}
                 <span className={`w-48 text-right text-xs flex items-center justify-end ${pc}`}>{rp}{opp.milestone && <MBar done={opp.milestone.done} total={opp.milestone.total} />}</span>
               </div>
             </div>
@@ -308,7 +314,7 @@ export function AllocationTable({
         </div>
         <div className="flex items-center gap-3 pr-4">{team.map(m => renderMH(m))}</div>
         <div className="flex items-center gap-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          <div className="w-10 text-right">Total</div><div className="w-16 text-right">Cost</div><div className="w-48 text-right">Projection</div>
+          <div className="w-10 text-right">Total</div><div className="w-16 text-right">Cost</div><div className="w-14 text-right">ROI</div><div className="w-48 text-right">Projection</div>
         </div>
       </div>
 

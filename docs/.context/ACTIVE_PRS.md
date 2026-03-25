@@ -4,13 +4,14 @@
 
 | PR | Title | Branch | Paper Trail | Depends On |
 |----|-------|--------|-------------|------------|
-| #1 | feat: MVP Vite app — port Magic Patterns design | `feature/pr-1-mvp-vite-app` | `docs/prs/2026-03-20-PR-1-mvp-vite-app/` | — |
-| #2 | feat: Formula-driven sheet + full 2-way sync | `feature/pr-2-formula-driven-sheet-sync` | `docs/prs/2026-03-20-PR-2-formula-driven-sheet-sync/` | #1 |
+| #3 | feat: ROI scorecard integration | `feature/pr-3-roi-scorecard-v2` | `docs/prs/2026-03-20-PR-3-roi-scorecard-integration/` | — |
 
-## Closed / Merged
+## Merged
 
 | PR | Title | Merged | Paper Trail |
 |----|-------|--------|-------------|
+| #1 | feat: MVP Vite app | 2026-03-20 | `docs/prs/2026-03-20-PR-1-mvp-vite-app/` |
+| #2 | feat: Formula-driven sheet + 2-way sync | 2026-03-20 | `docs/prs/2026-03-20-PR-2-formula-driven-sheet-sync/` |
 
 ---
-*Last updated: 2026-03-20 (PR #2 started)*
+*Last updated: 2026-03-20 (PRs #1 + #2 merged, PR #3 open)*

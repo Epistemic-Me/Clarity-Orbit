@@ -20,6 +20,22 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(isSheetConfigured() ? 'idle' : 'offline')
 
+  // Migration: backfill confidence/revenue/hours from defaults if missing
+  useEffect(() => {
+    const needsMigration = opportunities.some(o => o.confidence === undefined || o.confidence === null)
+    if (needsMigration) {
+      setOpportunities(opps => opps.map(o => {
+        const def = DEFAULT_OPPORTUNITIES.find(d => d.id === o.id)
+        return {
+          ...o,
+          confidence: o.confidence ?? def?.confidence ?? 0,
+          monthlyRevenue: o.monthlyRevenue ?? def?.monthlyRevenue,
+          weeklyHours: o.weeklyHours ?? def?.weeklyHours,
+        }
+      }))
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sheet sync: register status callback + refresh callback
   useEffect(() => {
     setSyncStatusCallback(setSyncStatus)
