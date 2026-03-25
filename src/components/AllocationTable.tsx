@@ -267,8 +267,8 @@ export function AllocationTable({
               <div className="flex items-center gap-5 text-sm font-mono">
                 <span className={`w-10 text-right font-bold ${rowT > 0 ? 'text-slate-800' : 'text-slate-300'}`}>{rowT}h</span>
                 <span className="w-16 text-right text-slate-400 text-xs">{rowCost > 0 ? `$${rowCost.toLocaleString()}` : '—'}</span>
-                {(() => { const roi = calculateROI(opp); return (
-                  <span className={`w-14 text-right text-xs font-bold ${roiColor(roi.roiMultiple)}`} title={`VPH: ${formatVPH(roi.vph)} | NPV: $${Math.round(roi.riskAdjNPV/1000)}K | Conf: ${Math.round(opp.confidence*100)}%`}>
+                {(() => { const roi = calculateROI(opp); const conf = opp.confidence || 0; return (
+                  <span className={`w-14 text-right text-xs font-bold ${roiColor(roi.roiMultiple)}`} title={`VPH: ${formatVPH(roi.vph)} | NPV: $${Math.round(roi.riskAdjNPV/1000)}K | Conf: ${Math.round(conf*100)}%`}>
                     {formatROI(roi.roiMultiple)}
                   </span>
                 ) })()}
