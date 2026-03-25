@@ -5,9 +5,9 @@ import { redistributeAllocations } from './lib/constraintEngine'
 import { useAnimatedNumber, usePersistedState } from './lib/hooks'
 import { AllocationTable } from './components/AllocationTable'
 import { RingHealthGauge } from './components/RingHealthGauge'
-import { ChevronLeft, ChevronRight, Copy, ClipboardCopy, Star, Lock, CheckCircle2, Cloud, CloudOff } from 'lucide-react'
-import { loadFromSheet, debouncedSaveWeek, saveTeamToSheet, saveOpportunitiesToSheet, lockInToSheet, setSyncStatusCallback, isSheetConfigured } from './lib/sheetSync'
-import type { SyncStatus } from './lib/sheetSync'
+import { ChevronLeft, ChevronRight, Copy, ClipboardCopy, Star, Lock, CheckCircle2, Cloud, CloudOff, RefreshCw } from 'lucide-react'
+import { loadFromSheet, debouncedSaveWeek, saveTeamToSheet, saveOpportunitiesToSheet, lockInToSheet, setSyncStatusCallback, isSheetConfigured, setRefreshCallback, refreshFromSheet, enableFocusRefresh } from './lib/sheetSync'
+import type { SyncStatus, SheetState } from './lib/sheetSync'
 
 export function App() {
   const [team, setTeam] = usePersistedState<TeamMember[]>('team', DEFAULT_TEAM)
@@ -20,10 +20,15 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(isSheetConfigured() ? 'idle' : 'offline')
 
-  // Sheet sync: register status callback
+  // Sheet sync: register status callback + refresh callback
   useEffect(() => {
     setSyncStatusCallback(setSyncStatus)
-  }, [])
+    setRefreshCallback((data: SheetState) => {
+      if (data.team?.length) setTeam(data.team)
+      if (data.opportunities?.length) setOpportunities(data.opportunities)
+    })
+    enableFocusRefresh()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sheet sync: load on first render
   useEffect(() => {
@@ -186,6 +191,9 @@ export function App() {
               <span className={`flex items-center gap-1 text-[10px] font-medium ${syncStatus === 'saved' ? 'text-emerald-500' : syncStatus === 'syncing' ? 'text-amber-500' : syncStatus === 'error' ? 'text-red-500' : 'text-slate-400'}`}>
                 {syncStatus === 'offline' ? <CloudOff size={12} /> : <Cloud size={12} />}
                 {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'saved' ? 'Saved' : syncStatus === 'error' ? 'Error' : ''}
+                <button onClick={() => refreshFromSheet().then(ok => ok && flash('Refreshed from Sheet'))} className="p-0.5 hover:text-forest rounded" title="Refresh from Sheet">
+                  <RefreshCw size={10} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
+                </button>
               </span>
             )}
             <button onClick={handleLockIn} disabled={currentWeek.lockedIn}
