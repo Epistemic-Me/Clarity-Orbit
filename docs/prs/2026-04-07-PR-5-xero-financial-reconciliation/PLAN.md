@@ -1,100 +1,231 @@
 # PR #5: xero-financial-reconciliation - Plan
 
 **Created**: 2026-04-07
+**Updated**: 2026-04-08
 **Based on**: [RESEARCH.md](./RESEARCH.md)
 **Branch**: `feature/pr-5-xero-financial-reconciliation`
 **Linear**: CLA-135
 
 ## Chosen Approach
 
-Hybrid: Claude Code conversational workflows (Xero MCP + Google Workspace MCP) that write actuals into the Sheets financial model. No new Orbit application code — this is an AI-native operations layer.
+Hybrid: Claude Code conversational workflows (Xero MCP + Google Workspace MCP) that clean up Xero classifications, journal personal card expenses, and write actuals into the Sheets financial model. Phase 0 added to fix Xero data quality before reconciliation.
 
 ## Scope
 
 ### In Scope
-- Xero discovery: validate current state (contacts, accounts, invoices)
-- Monthly P&L reconciliation workflow (Xero actuals vs Sheets forecast)
-- Invoice generation from Orbit lock-in data
-- Cash position / runway sync from Xero
-- Expense drift detection
-- Sheet structure changes to support actuals columns
+- **Phase 0:** Xero cleanup — reclassify revenue, break up Professional Fees, journal personal card expenses, reclassify convertible note, create missing contacts
+- **Phase 1:** Monthly P&L reconciliation workflow (Xero actuals vs Sheets forecast)
+- **Phase 2:** Invoice generation from Orbit lock-in data
+- **Phase 3:** Cash position / runway sync from Xero → Sheets
+- **Phase 4:** Expense drift detection (personal cards vs Xero vs Sheets budget)
+- **Phase 5:** Update Sheets financial model with actuals
+- **Phase 6:** Workflow runbook documentation
 
 ### Out of Scope
 - Automated scheduling (cron/triggers) — manual Claude Code commands for now
 - Orbit UI changes — no new buttons or views in the React app
-- Xero bank feed setup — assumed to be configured separately
-- Payroll integration — contractor payments tracked but not automated
+- Payroll automation — Rippling handles payroll, Xero records it
 - Multi-currency support
+- Stripe → Xero reconciliation (future work)
 
 ## Technical Design
 
+### Phase 0: Xero Cleanup
+
+#### 0a. Revenue Reclassification
+Reclassify $112,795 from Sale of Goods (4000) → Service Revenue (4100). EM sells consulting services, not goods.
+- **Method:** Manual journal entries or invoice edits in Xero
+- **Risk:** Low — accounting reclassification, no cash impact
+
+#### 0b. Break Up Professional Fees ($97,400)
+Current state: Account 6290 lumps together 1099 contractor comp, QA, social media, and actual professional fees.
+
+**Target classification:**
+| What | Current Account | Target Account | Monthly Amount |
+|------|----------------|----------------|----------------|
+| Robert 1099 comp | Professional Fees (6290) | Contract Labor (6090) | $4-14K/mo |
+| Jonathan 1099 comp | Professional Fees (6290) | Contract Labor (6090) | $9-14K/mo |
+| QA contractor (ThirstySprout) | Professional Fees (6290) | Contract Labor (6090) | $1,400-2,800/mo |
+| Social media (Contra/Benjamin) | Professional Fees (6290) | Advertising (6000) | ~$4,800/mo |
+| Actual professional fees | Professional Fees (6290) | Professional Fees (6290) | Keep here |
+
+- **Method:** Journal entries: Debit target accounts, Credit 6290
+- **Risk:** Medium — need to identify exact amounts per category from bank transactions
+
+#### 0c. Journal Personal Card Expenses ($11,301)
+182 transactions on personal cards (5071, 3605, 4262) need to be entered.
+
+**Category mapping to Xero accounts:**
+| Expense Sheet Category | Xero Account | Code |
+|----------------------|-------------|------|
+| AI/ML Subscriptions | Dues and Subscriptions | 6110 |
+| AI/ML APIs | Cost of Goods Sold | 5000 |
+| Dev Tools, Dev Tools/Security | Software & Web | 6340 |
+| Hosting | Software & Web | 6340 |
+| Team Tools (Slack/Google) | Software & Web | 6340 |
+| Sales/Marketing, Sales/CRM | Advertising | 6000 |
+| Business Services, Legal, Tax, HR | Professional Fees | 6290 |
+| Domain | Software & Web | 6340 |
+| Email Service | Software & Web | 6340 |
+| Contractor - Social Media | Advertising | 6000 |
+| Community Membership (ACQ) | Training and Conferences | 6400 |
+| Content/Video, AI Video | Advertising | 6000 |
+| Internet, Coworking | Telephone and Internet | 6390 |
+
+- **Method:** Journal entry: Debit various expense accounts $11,301, Credit Due to Director (820) $11,301
+- **Note:** This increases 820 from $32,475 to $43,776
+- **Risk:** Low — standard director expense reimbursement accounting
+
+#### 0d. Convertible Note Reclassification
+Move $32,475 from Account 820 (Due to Director) → Loans From Shareholder (2550).
+- **Method:** Journal entry: Debit 820 $32,475, Credit 2550 $32,475
+- **Note:** After 0c journaling, 820 will have $43,776. Only the original $32,475 capital injection moves to 2550. The $11,301 personal card reimbursement stays in 820 as a true director reimbursement.
+- **Risk:** Low — need to confirm convertible note agreement is signed
+
+#### 0e. Create Missing Contacts
+| Contact | Type | Purpose |
+|---------|------|---------|
+| Mystica AI | Customer | Retainer + profit share invoicing |
+| Contra / Benjamin | Supplier | Social media contractor |
+| Anthropic | Supplier | AI API and subscription costs |
+| Intapp | Prospect | Future client (discovery stage) |
+
+#### 0f. COGS Setup
+Move AI/ML API costs ($1,036 from expense sheet) to Cost of Goods Sold (5000).
+Move hosting costs ($1,371 from expense sheet) to COGS or keep in Software & Web with tracking.
+- **Why:** These are direct costs of delivering services to Dayforce/Mystica, not overhead
+
+### Phase 1-5: Reconciliation Workflows (unchanged approach)
+
+#### Workflow 1: Monthly Reconciliation
+```
+Trigger: "Reconcile {month}" in Claude Code
+1. Pull Xero P&L for period (list-profit-and-loss)
+2. Pull Xero balance sheet (list-report-balance-sheet)
+3. Read Sheets Monthly P&L forecast columns
+4. Compare actuals vs forecast, produce variance report
+5. Write actuals into Sheets "Actual" columns
+```
+
+#### Workflow 2: Invoice from Lock-Ins
+```
+Trigger: "Generate invoices for {month}" in Claude Code
+1. Read Orbit:LockInLog from Sheets
+2. Sum hours by client for billing period
+3. Dayforce: $25K flat (create-invoice)
+4. Mystica: $13K retainer + calculated profit share (create-invoice)
+5. Create as DRAFT for human review
+```
+
+#### Workflow 3: Cash Pulse
+```
+Trigger: "Cash position" in Claude Code
+1. Pull Xero bank balance (list-report-balance-sheet)
+2. Pull AR (list-aged-receivables-by-contact) — currently $75K Dayforce
+3. Pull AP (list-aged-payables-by-contact)
+4. Write to Sheets Runway & KPIs: real cash, AR, AP
+5. Flag overdue invoices
+```
+
+#### Workflow 4: Expense Audit
+```
+Trigger: "Audit expenses for {month}" in Claude Code
+1. Pull Xero bank transactions for period
+2. Read expense sheet for same period
+3. Read Sheets Expense Detail budgets
+4. Three-way compare: Xero actuals vs expense sheet vs budget
+5. Flag variances > 10%, missing entries, uncategorized items
+```
+
 ### Changes Required
 
-| File | Change | Why |
-|------|--------|-----|
-| Google Sheet: Monthly P&L | Add "Actual" columns alongside forecast | Enable variance tracking |
-| Google Sheet: Runway & KPIs | Wire AR/AP/Cash to pull from Actuals | Real-time financial health |
-| Google Sheet: Balance Sheet | Populate with Xero-derived data | Currently entirely empty |
-| Google Sheet: Expense Detail | Add "Actual" column per month | Drift detection |
+| Target | Change | Why |
+|--------|--------|-----|
+| Xero: Revenue accounts | Reclassify 4000 → 4100 | Services, not goods |
+| Xero: Professional Fees | Break $97K into 6090/6000/6290 | Accurate comp vs marketing vs professional fees |
+| Xero: Account 820 | Journal $11K personal expenses, reclassify $32K to 2550 | Director reimbursement + convertible note |
+| Xero: Contacts | Add Mystica, Contra, Anthropic, Intapp | Missing from ledger |
+| Xero: COGS | Categorize AI APIs as direct costs | Accurate gross margin |
+| Sheets: Monthly P&L | Add "Actual" columns alongside forecast | Variance tracking |
+| Sheets: Expense Detail | Replace budgets with actuals-derived amounts | Accurate burn tracking |
+| Sheets: Runway & KPIs | Wire to Xero actuals (cash, AR, AP) | Real-time financial health |
+| Sheets: Balance Sheet | Populate from Xero balance sheet | Currently all $0s |
 
 ### New Files
 
 | File | Purpose |
 |------|---------|
-| `docs/workflows/monthly-reconciliation.md` | Runbook for monthly close workflow |
-| `docs/workflows/invoice-generation.md` | Runbook for lock-in → invoice workflow |
-| `docs/workflows/cash-pulse.md` | Runbook for on-demand cash position check |
-| `docs/workflows/expense-audit.md` | Runbook for expense drift detection |
+| `docs/workflows/monthly-reconciliation.md` | Runbook for monthly close |
+| `docs/workflows/invoice-generation.md` | Runbook for lock-in → invoice |
+| `docs/workflows/cash-pulse.md` | Runbook for cash position check |
+| `docs/workflows/expense-audit.md` | Runbook for three-way expense comparison |
+| `docs/workflows/xero-mcp-setup.md` | Setup guide: Custom Connection, scope patch, 1Password |
 
 ## Implementation Order
 
-1. **Phase 1: Xero Discovery** — Pull current Xero state (contacts, accounts, invoices, balances) to understand baseline
-2. **Phase 2: Sheet Structure** — Add Actuals columns to Monthly P&L and Expense Detail
-3. **Phase 3: Reconciliation Workflow** — Build and test monthly P&L reconciliation
-4. **Phase 4: Invoice Workflow** — Build lock-in → draft invoice generation
-5. **Phase 5: Cash Pulse Workflow** — Build on-demand cash position sync
-6. **Phase 6: Runbook Documentation** — Document all workflows for repeatable use
+1. **Phase 0a:** Revenue reclassification (Sale of Goods → Service Revenue)
+2. **Phase 0b:** Break up Professional Fees into Contract Labor + Advertising
+3. **Phase 0c:** Journal personal card expenses ($11,301) → Account 820
+4. **Phase 0d:** Reclassify convertible note ($32,475) → Account 2550
+5. **Phase 0e:** Create missing contacts (Mystica, Contra, Anthropic, Intapp)
+6. **Phase 0f:** Set up COGS tracking for AI APIs + hosting
+7. **Phase 1:** Build and test monthly P&L reconciliation workflow
+8. **Phase 2:** Build lock-in → draft invoice generation workflow
+9. **Phase 3:** Build cash pulse workflow (Xero → Sheets Runway & KPIs)
+10. **Phase 4:** Build three-way expense audit workflow
+11. **Phase 5:** Update Sheets financial model with Xero actuals
+12. **Phase 6:** Document all workflows as runbooks
 
 ## Testing Strategy
 
-### Phase 1: Read-Only Validation (Safe)
-- [ ] `list-contacts`: Verify Dayforce (Ceridian), Mystica exist as Xero contacts
-- [ ] `list-invoices`: Verify invoice history matches known billing periods
-- [ ] `list-accounts`: Verify chart of accounts has expected categories
-- [ ] `list-bank-transactions`: Verify expense transactions match Expense Detail categories
-- [ ] `list-aged-receivables-by-contact`: Verify AR matches outstanding invoices
-- [ ] `list-profit-and-loss`: Compare Xero P&L vs Sheets P&L for overlapping periods
-- [ ] `list-report-balance-sheet`: Get baseline balance sheet from Xero
+### Phase 0: Xero Cleanup Validation
+- [x] `list-accounts`: Verified 119 accounts, identified correct target accounts
+- [x] `list-contacts`: Verified 11 contacts, identified 4 missing
+- [x] `list-invoices`: Verified 10 invoices (1 paid, 1 authorised, 8 voided Rippling)
+- [x] `list-profit-and-loss`: Verified $189K revenue, $110K expenses, $79K net income
+- [x] `list-report-balance-sheet`: Verified $36K cash, $75K AR, $32K director loan
+- [x] `list-bank-transactions`: Verified Chase transactions (Rippling, ThirstySprout, Slack, Xero, Gov)
+- [ ] After reclassification: P&L shows $0 in Sale of Goods, all in Service Revenue
+- [ ] After breakup: Professional Fees < $10K, Contract Labor shows comp amounts
+- [ ] After journaling: Account 820 increased by $11,301
+- [ ] After convertible note move: 820 reduced by $32,475, 2550 shows $32,475
+- [ ] Missing contacts created and verified
 
-### Phase 2: Write Validation (Careful)
-- [ ] Create a DRAFT invoice for a known billing period — verify line items, amounts, contact
-- [ ] Verify the draft invoice matches what would be manually created
-- [ ] Delete/void the test draft after validation
-- [ ] Create a test contact (Intapp) — verify fields populated correctly
-- [ ] Run reconciliation workflow twice — verify no duplicate sheet entries
-
-### Phase 3: Workflow Validation
+### Phase 1-4: Workflow Validation
 - [ ] Monthly reconciliation: Run for Mar'26, verify actuals match Xero, variances flagged
-- [ ] Invoice generation: Use 3/30 lock-in data, verify Mystica invoice amounts
-- [ ] Cash pulse: Verify bank balance, AR, AP populate Runway & KPIs correctly
-- [ ] Expense audit: Verify drift detection catches intentional test variance
+- [ ] Invoice generation: Generate Dayforce Apr invoice, verify $25K amount and contact
+- [ ] Cash pulse: Verify $36,458 cash, $75K AR populate Runway & KPIs
+- [ ] Expense audit: Three-way compare catches known discrepancies (tooling budget $649 vs $1,100 actual)
 
-### Phase 4: End-to-End
-- [ ] Full monthly close: lock-in → invoice → payment → reconcile → runway update
-- [ ] Verify all Sheets tabs reflect consistent, accurate data after workflow
+### Phase 5: Sheets Model Validation
+- [ ] Monthly P&L actual columns match Xero P&L report
+- [ ] Balance Sheet populated: $111K assets, $32K liabilities, $79K equity
+- [ ] Runway & KPIs shows real cash ($36K), real AR ($75K), calculated runway
+- [ ] Expense Detail reflects actual category spending, not budgeted
+
+### End-to-End
+- [ ] Full monthly close: lock-in → invoice → Xero sync → reconcile → Sheets update
+- [ ] Financial model and Xero agree on all major line items
 
 ## Rollback Plan
 
-- All Xero invoices created as DRAFT (not sent) — can be deleted
+- All Xero journal entries can be reversed with counter-entries
+- Revenue reclassification is journal entries — reversible
+- Contact creation is additive — no destructive changes
 - Sheet changes are additive (new columns) — existing formulas unaffected
-- Workflow runbooks are documentation only — no code dependencies
-- Git revert of sheet structure changes if needed
+- All workflows are Claude Code commands — no deployed code dependencies
+- Git revert of documentation changes if needed
 
 ## Definition of Done
 
-- [ ] Xero state validated and documented
-- [ ] Sheet structure updated with Actuals support
+- [ ] Xero revenue correctly classified as Service Revenue
+- [ ] Professional Fees broken into Contract Labor + Advertising + actual fees
+- [ ] Personal card expenses journaled to correct accounts
+- [ ] Convertible note reclassified to Loans From Shareholder
+- [ ] Missing contacts created
+- [ ] COGS tracking operational
 - [ ] All 4 workflows tested against real data
+- [ ] Sheets financial model reflects Xero actuals
 - [ ] Runbook documentation complete
-- [ ] GitHub PR created and reviewed
+- [ ] GitHub PR reviewed and merged
 - [ ] Linear CLA-135 moved to Done
