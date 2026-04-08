@@ -136,13 +136,20 @@ Key items from Jonathan's reconciliation document:
 
 Claude Code MCP workflows handle all Xero operations. Sheets model gains Actuals columns. But we now add a **Phase 0: Xero Cleanup** to fix classification issues before reconciliation can be meaningful.
 
-## Open Questions (Updated)
+## Open Questions (Updated Apr 8)
 
 - [x] What's currently set up in Xero? → 119 accounts, 11 contacts, $189K revenue, $110K expenses
 - [x] Does Xero have bank feed connected? → Chase checking connected, transactions being entered
 - [ ] Should invoices be created as DRAFT or AUTHORISED? (recommend DRAFT for review)
 - [ ] What's the desired frequency for reconciliation? Monthly? (recommend monthly close)
 - [x] Should we add an "Actuals" tab or actuals columns? → Actuals columns alongside forecast
-- [ ] How should Mystica revenue be split? Tom Cote is the contact, not "Mystica" — need clarification
-- [ ] Is the convertible note agreement signed? Need to attach to journal entry
-- [ ] Should ACQ Community ($12K) be classified as Marketing or Professional Development?
+- [x] Mystica billing entity? → **Relationship Psychics** (legal entity). Tom Cote is the contact person.
+- [x] Convertible note? → **No note exists.** $32,475 is an equity purchase → Additional Paid In Capital (3200)
+- [x] ACQ Community classification? → **Lead gen** → Advertising (6000)
+- [x] Revenue split intent? → All current revenue is Service Revenue (4100). Sale of Goods was misclassified. Future software revenue gets a new account.
+- [x] Social media contractor? → Mar'26 was **final payment**. Contractor ended.
+- [x] ThirstySprout? → Paid from business account, already in Xero. No journaling needed.
+- [x] Stripe reconciliation? → **No Stripe revenue.** Ignore.
+- [x] Intapp timeline? → **Closing within 2 weeks (~Apr 22).** Create contact + invoice template now.
+- [x] Sheets model approach? → Restate to match Xero actuals, then keep forward-looking.
+- [ ] Sep'26 comp W2/1099 split? (non-blocking, decide closer to September)

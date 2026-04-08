@@ -68,7 +68,7 @@ Current state: Account 6290 lumps together 1099 contractor comp, QA, social medi
 | Domain | Software & Web | 6340 |
 | Email Service | Software & Web | 6340 |
 | Contractor - Social Media | Advertising | 6000 |
-| Community Membership (ACQ) | Training and Conferences | 6400 |
+| Community Membership (ACQ) | Advertising | 6000 |
 | Content/Video, AI Video | Advertising | 6000 |
 | Internet, Coworking | Telephone and Internet | 6390 |
 
@@ -76,19 +76,20 @@ Current state: Account 6290 lumps together 1099 contractor comp, QA, social medi
 - **Note:** This increases 820 from $32,475 to $43,776
 - **Risk:** Low — standard director expense reimbursement accounting
 
-#### 0d. Convertible Note Reclassification
-Move $32,475 from Account 820 (Due to Director) → Loans From Shareholder (2550).
-- **Method:** Journal entry: Debit 820 $32,475, Credit 2550 $32,475
-- **Note:** After 0c journaling, 820 will have $43,776. Only the original $32,475 capital injection moves to 2550. The $11,301 personal card reimbursement stays in 820 as a true director reimbursement.
-- **Risk:** Low — need to confirm convertible note agreement is signed
+#### 0d. Equity Reclassification
+Move $32,475 from Account 820 (Due to Director) → Additional Paid In Capital (3200).
+Robert's capital injections are an equity purchase, not a loan or convertible note. No note agreement exists.
+- **Method:** Journal entry: Debit 820 $32,475, Credit 3200 $32,475
+- **Note:** After 0c journaling, 820 will have $43,776. Only the original $32,475 moves to equity. The $11,301 personal card reimbursement stays in 820 as a true director reimbursement.
+- **Risk:** Low — straightforward equity classification
 
 #### 0e. Create Missing Contacts
 | Contact | Type | Purpose |
 |---------|------|---------|
-| Mystica AI | Customer | Retainer + profit share invoicing |
-| Contra / Benjamin | Supplier | Social media contractor |
+| Relationship Psychics | Customer | Mystica's legal entity — retainer + profit share invoicing |
+| Contra / Benjamin | Supplier | Social media contractor (final payment Mar'26) |
 | Anthropic | Supplier | AI API and subscription costs |
-| Intapp | Prospect | Future client (discovery stage) |
+| Intapp | Customer | Closing within 2 weeks (~Apr 22) — need contact + invoice template ready |
 
 #### 0f. COGS Setup
 Move AI/ML API costs ($1,036 from expense sheet) to Cost of Goods Sold (5000).
@@ -166,7 +167,7 @@ Trigger: "Audit expenses for {month}" in Claude Code
 1. **Phase 0a:** Revenue reclassification (Sale of Goods → Service Revenue)
 2. **Phase 0b:** Break up Professional Fees into Contract Labor + Advertising
 3. **Phase 0c:** Journal personal card expenses ($11,301) → Account 820
-4. **Phase 0d:** Reclassify convertible note ($32,475) → Account 2550
+4. **Phase 0d:** Reclassify equity ($32,475) → Additional Paid In Capital (3200)
 5. **Phase 0e:** Create missing contacts (Mystica, Contra, Anthropic, Intapp)
 6. **Phase 0f:** Set up COGS tracking for AI APIs + hosting
 7. **Phase 1:** Build and test monthly P&L reconciliation workflow
@@ -188,7 +189,7 @@ Trigger: "Audit expenses for {month}" in Claude Code
 - [ ] After reclassification: P&L shows $0 in Sale of Goods, all in Service Revenue
 - [ ] After breakup: Professional Fees < $10K, Contract Labor shows comp amounts
 - [ ] After journaling: Account 820 increased by $11,301
-- [ ] After convertible note move: 820 reduced by $32,475, 2550 shows $32,475
+- [ ] After equity reclassification: 820 reduced by $32,475, Additional Paid In Capital (3200) shows $32,475
 - [ ] Missing contacts created and verified
 
 ### Phase 1-4: Workflow Validation
@@ -221,7 +222,7 @@ Trigger: "Audit expenses for {month}" in Claude Code
 - [ ] Xero revenue correctly classified as Service Revenue
 - [ ] Professional Fees broken into Contract Labor + Advertising + actual fees
 - [ ] Personal card expenses journaled to correct accounts
-- [ ] Convertible note reclassified to Loans From Shareholder
+- [ ] Equity reclassified to Additional Paid In Capital (3200)
 - [ ] Missing contacts created
 - [ ] COGS tracking operational
 - [ ] All 4 workflows tested against real data
