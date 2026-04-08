@@ -1,29 +1,48 @@
 # PR #5: xero-financial-reconciliation - Plan
 
 **Created**: 2026-04-07
-**Updated**: 2026-04-08 (v3 — reordered: Xero accrual first, then Sheets alignment, then workflows)
+**Updated**: 2026-04-08 (v4 — added Orbit integration, Apps Script, historical restatement, transition plan)
 **Based on**: [RESEARCH.md](./RESEARCH.md)
 **Branch**: `feature/pr-5-xero-financial-reconciliation`
 **Linear**: CLA-135
 
 ## Chosen Approach
 
-**Xero-first, accrual-basis accounting.** Fix Xero to be the source of truth with proper COGS, expense classification, accrual adjustments, and equity realization. Then restructure the Sheets P&L to mirror Xero's account hierarchy. Then build reconciliation workflows. Orbit remains the planning interface for IRR/resource allocation, reading from the aligned Sheets model.
+**Xero-first, accrual-basis accounting.** Fix Xero to be the source of truth with proper COGS, expense classification, accrual adjustments, and equity realization. Then restructure the Sheets P&L to mirror Xero's account hierarchy. Then build reconciliation workflows. Orbit remains the planning interface for IRR/resource allocation — its code doesn't change, but the Apps Script bridge and Sheets structure it reads from do.
 
 ## Scope
 
 ### In Scope
 - **Phase 0:** Xero accounting standards — COGS setup, accrual adjustments, expense reclassification, equity realization, missing contacts
-- **Phase 1:** Sheets P&L restructuring — mirror Xero's Revenue → COGS → Gross Margin → OpEx → Net Income structure
-- **Phase 2:** Monthly reconciliation workflow — Xero actuals → Sheets actuals columns
+- **Phase 1:** Sheets P&L restructuring — mirror Xero's Revenue → COGS → Gross Margin → OpEx → Net Income
+- **Phase 1b:** Apps Script update — re-map Orbit data writes to new Sheets structure
+- **Phase 1c:** IRR/LTV/Scorecard tab formula audit — ensure they survive restructuring
+- **Phase 2:** Monthly reconciliation + COGS labor allocation workflows
 - **Phase 3:** Invoice generation, cash pulse, expense audit workflows
-- **Phase 4:** Workflow runbook documentation
+- **Phase 4:** Orbit code cleanup (CPL formula, stale defaults) + runbook docs
 
 ### Out of Scope
 - Automated scheduling — manual Claude Code commands for now
-- Orbit UI changes — Orbit reads from Sheets, no new views needed
+- New Orbit UI views — Orbit's React code is hours-only, financial display stays as-is
 - Payroll automation — Rippling handles payroll, Xero records it
 - Multi-currency support
+- Full historical restatement to Jul'25 — start clean from cutover month
+
+## Key Decision: Historical Restatement
+
+**Decision: Start clean from Apr'26 forward.** Do not restate Jul'25 → Mar'26.
+
+**Rationale:**
+- Orbit lock-in data only exists for weeks of 3/16, 3/23, 3/30 — no hours data before mid-March to drive COGS labor allocation
+- Attempting to retroactively estimate client-work % without Orbit data would be guesswork
+- The 2025 Retained Earnings (-$19,702) stays as-is in Xero — a clean historical figure
+- Apr'26 is the first month where Xero, Sheets, and Orbit are all aligned
+
+**What this means:**
+- Phase 0 Xero cleanup fixes classifications going forward (new transactions get correct accounts)
+- Historical transactions in wrong accounts (e.g., $112K in Sale of Goods) get reclassified via journal entries — this fixes the cumulative totals but doesn't create month-by-month historical COGS
+- Mar'26 becomes the "bridge month" — partial data, used for testing workflows
+- Apr'26 is the first fully accrual-basis month with COGS allocation from Orbit
 
 ## Technical Design
 
@@ -49,13 +68,13 @@ Revenue → COGS → Gross Profit (margin %) → OpEx → Net Income (margin %)
 
 **Accrual method for labor COGS:**
 1. Each month, pull Orbit lock-in data for hours by opportunity
-2. Calculate % of Robert/Jonathan hours on client-billable work (inner + middle ring)
+2. Calculate % of Robert/Jonathan hours on client-billable work (middle ring = Dayforce + Mystica)
 3. Allocate that % of their monthly comp to COGS (5100)
-4. Remainder stays in OpEx as R&D/platform investment
+4. Remainder stays in OpEx as R&D/platform investment (6090)
 
-**Example — March 2026:**
-- Robert: 55h total, 35h on Dayforce+Mystica = 64% → $5K total comp × 64% = $3,200 COGS
-- Jonathan: 47h total, 40h on Dayforce+Mystica = 85% → $15K total comp × 85% = $12,750 COGS
+**Example — March 2026 (from Orbit lock-ins):**
+- Robert: 55h total, 35h on Dayforce+Mystica = 64% → $5K comp × 64% = $3,200 COGS
+- Jonathan: 47h total, 40h on Dayforce+Mystica = 85% → $15K comp × 85% = $12,750 COGS
 - QA: 15h all client work = 100% → $2,800 COGS
 - Total COGS labor: $18,750
 - Revenue: ~$46K → **Gross margin: ~59%**
@@ -64,7 +83,7 @@ Revenue → COGS → Gross Profit (margin %) → OpEx → Net Income (margin %)
 
 Reclassify $112,795 from Sale of Goods (4000) → Service Revenue (4100).
 - All current revenue is services (Dayforce consulting, Mystica retainer + profit share)
-- Future software revenue (Clarity Builder, PEPM) will go to a new **Software Revenue** account when it materializes
+- Future software revenue (Clarity Builder, PEPM) will use a new account when it materializes
 
 #### 0c. Break Up Professional Fees ($97,400)
 
@@ -110,19 +129,15 @@ Robert's capital injections are an equity purchase. After 0d, 820 will have $43,
 | Relationship Psychics | Customer | Mystica's legal entity |
 | Contra / Benjamin | Supplier | Social media (ended Mar'26) |
 | Anthropic | Supplier | AI API + subscriptions |
-| Intapp | Customer | Closing ~Apr 22 |
+| Intapp | Customer | Closing ~Apr 22 — create contact + invoice template proactively |
 
 ### Phase 1: Sheets P&L Restructuring
 
-**Problem:** The current Sheets Monthly P&L has this structure:
-```
-Platform Revenue → Services Revenue → Reference Design Revenue → Total Revenue
-→ COGS (flat estimates) → Gross Profit → OpEx → Net Income
-```
+#### 1a. Monthly P&L Structure
 
-This doesn't match Xero's chart of accounts. The categories are different, the line items don't align, and there's no way to drop Xero actuals directly into the model.
+**Problem:** Current Sheets P&L uses custom categories (Platform Revenue / Services Revenue / Reference Design Revenue) that don't match Xero's chart of accounts. Actuals from Xero can't drop in without manual mapping.
 
-**Fix:** Restructure Sheets Monthly P&L to match Xero's account hierarchy:
+**Fix:** Restructure to mirror Xero:
 
 ```
 SERVICE REVENUE
@@ -167,19 +182,59 @@ Each month gets two columns: **Forecast** and **Actual**. Actuals populated from
 Also restructure:
 - **Balance Sheet** → populate from Xero balance sheet report
 - **Runway & KPIs** → wire to Xero actuals (real cash, AR, AP)
-- **Expense Detail** → replace flat budgets with Xero-derived actuals
+- **Expense Detail** → replace flat budgets with Xero-derived actuals per category
 
-### Phase 2: Monthly Reconciliation Workflow
+#### 1b. Apps Script Update
 
+**Problem:** The Apps Script (`Code.gs`, project ID `1Ea2gdGOSDr534PmA55NZ_GPEwHgcVJ5frcC-fVNjKTljDWP0x-S8a3f2`) maps Orbit data to specific Sheet rows/tabs. When we restructure the P&L, any row references in the Apps Script will break.
+
+**What to check:**
+- `saveWeek` handler — writes allocations to `Orbit:Week:*` tabs (likely fine — separate tabs)
+- `saveTeam` handler — writes team data to `Orbit:Team` tab (likely fine)
+- `saveOpportunities` handler — writes to `Orbit:Opportunities` tab (likely fine)
+- Any logic that writes to `Resource Allocation` or financial model tabs (would break)
+
+**Method:** Read `Code.gs` from the Apps Script editor, identify all row/tab references to financial model tabs, update to match new structure.
+
+**Risk:** Medium — the Apps Script is not version-controlled. Read it first, make targeted changes.
+
+#### 1c. IRR / LTV / Scorecard Formula Audit
+
+**Problem:** The Sheets model has `IRR by Channel`, `LTV Model`, `ROI Forecast`, and `ROI Scorecard` tabs that likely reference the current P&L structure via cell references or named ranges. Restructuring the P&L will break these formulas silently.
+
+**Method:**
+1. Read each tab's formulas (Google Workspace MCP: `read_sheet_values` with `include_formulas: true`)
+2. Map all cross-tab references to the Monthly P&L
+3. Update references to match new row structure
+4. Verify calculations produce same results before/after
+
+**Risk:** High if ignored — broken formulas produce wrong numbers silently. Must audit before restructuring.
+
+### Phase 2: Reconciliation Workflows
+
+#### Monthly Reconciliation (Xero → Sheets)
 ```
 Trigger: "Reconcile {month}" in Claude Code
-1. Pull Xero P&L for period (list-profit-and-loss --fromDate --toDate)
+1. Pull Xero P&L for period (list-profit-and-loss --fromDate --toDate --timeframe MONTH)
 2. Pull Xero balance sheet (list-report-balance-sheet)
-3. Map Xero accounts to Sheets rows (account code → row mapping)
+3. Map Xero account codes to Sheets rows (defined mapping table)
 4. Write actuals into Sheets "Actual" columns for that month
-5. Calculate variances (actual - forecast) automatically via Sheet formulas
-6. Produce summary: gross margin %, net margin %, key variances
+5. Calculate variances via Sheet formulas (actual - forecast)
+6. Produce summary: gross margin %, net margin %, top 3 variances
 ```
+
+#### COGS Labor Allocation (Orbit → Xero)
+```
+Trigger: "Allocate COGS for {month}" in Claude Code
+1. Read Orbit:LockInLog from Sheets for all weeks in the month
+2. Sum hours by person by opportunity
+3. Calculate client-work % (middle ring hours / total hours) for Robert & Jonathan
+4. Compute COGS amounts: client-work % × monthly comp
+5. Create journal entry in Xero: Debit COGS-Labor (5100), Credit Contract Labor (6090)
+6. Verify: Xero P&L now shows COGS and gross margin for the month
+```
+
+This is the **key new workflow** that bridges Orbit → Xero directly. It's what makes gross margin real.
 
 ### Phase 3: Supporting Workflows
 
@@ -206,18 +261,45 @@ Trigger: "Reconcile {month}" in Claude Code
 4. Flag variances, missing entries, uncategorized items
 ```
 
-**COGS Labor Allocation (monthly):**
-```
-1. Pull Orbit lock-in hours for the month
-2. Calculate client-work % for Robert & Jonathan
-3. Journal COGS allocation in Xero (Debit 5100, Credit 6090)
-4. This is the key input for accurate gross margin
-```
+### Phase 4: Orbit Code Cleanup + Runbooks
+
+#### 4a. CPL Formula Fix
+`AllocationTable.tsx:278` hardcodes `$4,000/4.3` (social media agency monthly / weeks) and `$150/hr`. The social media agency ended in March. Either:
+- Remove the hardcoded agency cost (just use `demandGen.hours * rate`)
+- Or parameterize it so it can be set to $0
+
+#### 4b. Default Opportunities Staleness
+`src/lib/data.ts` has hardcoded `monthlyRevenue` and `weeklyHours` arrays per opportunity as seed data. These were the original forecasts. Now that Sheets is the source of truth:
+- These are only used for first-time initialization (before Sheets sync loads)
+- Low priority — consider marking them as seed data with a comment, or loading from Sheets on first sync
+
+#### 4c. Workflow Runbooks
+Document all workflows as repeatable runbooks:
+| File | Purpose |
+|------|---------|
+| `docs/workflows/monthly-close.md` | Full monthly close: COGS allocation + reconciliation + Sheets update |
+| `docs/workflows/invoice-generation.md` | Lock-in → DRAFT invoice in Xero |
+| `docs/workflows/cash-pulse.md` | On-demand cash position check |
+| `docs/workflows/expense-audit.md` | Three-way expense comparison |
+| `docs/workflows/xero-mcp-setup.md` | Custom Connection setup, scope patch, 1Password config |
+
+## Transition Plan
+
+**Approach: Parallel run, then cutover.**
+
+1. **Phase 0 (Xero cleanup):** Execute journal entries in Xero. This fixes cumulative totals but doesn't restructure Sheets yet. Old Sheets structure continues to work.
+2. **Phase 1 (Sheets restructuring):** Create new P&L structure in a **new tab** (`Monthly P&L v2`) alongside the existing tab. Don't delete the old one yet.
+3. **Validation:** Run the April reconciliation against both old and new tabs. Verify totals match (different structure, same numbers).
+4. **Cutover:** Once validated, rename `Monthly P&L` → `Monthly P&L (legacy)` and `Monthly P&L v2` → `Monthly P&L`. Update any cross-tab references (IRR, LTV, etc.) to point to the new tab.
+5. **Apps Script update:** Update `Code.gs` to write Orbit data to the new structure.
+6. **Cleanup:** After 1 month of stable operation, archive the legacy tab.
+
+This ensures zero downtime — the old model keeps working until the new one is validated.
 
 ## Implementation Order
 
-### Priority 1: Xero Source of Truth
-1. **0a.** COGS account setup and initial labor allocation
+### Priority 1: Xero Source of Truth (Phase 0)
+1. **0a.** COGS account setup and initial labor allocation (Apr'26 as first month)
 2. **0b.** Revenue reclassification (Sale of Goods → Service Revenue)
 3. **0c.** Break up Professional Fees → Contract Labor + Advertising
 4. **0d.** Journal personal card expenses ($11,301) → Account 820
@@ -225,18 +307,25 @@ Trigger: "Reconcile {month}" in Claude Code
 6. **0f.** Accrual adjustments (prepaid amortization, expense matching)
 7. **0g.** Create missing contacts (Relationship Psychics, Intapp)
 
-### Priority 2: Sheets Alignment
-8. Restructure Sheets Monthly P&L to mirror Xero account hierarchy
-9. Add Forecast + Actual column pairs per month
-10. Restructure Balance Sheet, Runway & KPIs to pull from Xero
-11. Replace Expense Detail budgets with actuals-derived numbers
+### Priority 2: Sheets Alignment (Phase 1)
+8. **1c.** Audit IRR/LTV/Scorecard formulas FIRST (understand what will break)
+9. **1a.** Create new P&L tab mirroring Xero structure (parallel to old tab)
+10. Add Forecast + Actual column pairs per month
+11. Restructure Balance Sheet, Runway & KPIs
+12. **1b.** Update Apps Script to write to new structure
+13. Validate: run April reconciliation against both old and new tabs
+14. Cutover: swap tabs, update cross-references
 
-### Priority 3: Workflow Automation
-12. Build monthly reconciliation workflow (Xero → Sheets)
-13. Build COGS labor allocation workflow (Orbit hours → Xero journal)
-14. Build invoice generation workflow (lock-ins → Xero DRAFT)
-15. Build cash pulse + expense audit workflows
-16. Document all workflows as runbooks
+### Priority 3: Workflow Automation (Phase 2-3)
+15. Build COGS labor allocation workflow (Orbit hours → Xero journal)
+16. Build monthly reconciliation workflow (Xero → Sheets)
+17. Build invoice generation workflow (lock-ins → Xero DRAFT)
+18. Build cash pulse + expense audit workflows
+
+### Priority 4: Cleanup (Phase 4)
+19. Fix CPL formula in `AllocationTable.tsx`
+20. Document all workflows as runbooks
+21. Archive legacy Sheets tabs after 1 month stable
 
 ## Testing Strategy
 
@@ -253,25 +342,34 @@ Trigger: "Reconcile {month}" in Claude Code
 - [ ] **Monthly P&L from Xero shows explicit gross margin per month**
 
 ### Phase 1: Sheets Model Validation
-- [ ] Sheets P&L structure matches Xero account hierarchy
+- [ ] IRR/LTV/Scorecard formula audit complete — all cross-references mapped
+- [ ] New P&L tab created alongside old tab (parallel run)
 - [ ] Revenue → COGS → Gross Margin → OpEx → Net Income flows correctly
 - [ ] Each month has Forecast + Actual columns
-- [ ] Balance Sheet populated from Xero ($111K assets, $32K liabilities)
+- [ ] Balance Sheet populated from Xero ($111K assets)
 - [ ] Runway & KPIs wired to real Xero data
+- [ ] Apps Script updated and tested — Orbit data writes to new structure
+- [ ] Old tab and new tab produce consistent totals
 
 ### Phase 2-3: Workflow Validation
-- [ ] Monthly reconciliation: run for Mar'26, actuals populate Sheets correctly
 - [ ] COGS allocation: Orbit hours drive labor COGS split in Xero
+- [ ] Monthly reconciliation: run for Apr'26, actuals populate Sheets correctly
 - [ ] Invoice generation: DRAFT invoice matches expected amounts
 - [ ] Cash pulse: real bank balance, AR, AP in Sheets
 - [ ] Gross margin % consistent between Xero report and Sheets model
 
+### Phase 4: Cleanup Validation
+- [ ] CPL formula updated (no hardcoded agency cost)
+- [ ] Runbooks documented and tested
+- [ ] Legacy tabs archived after 1 month stable
+
 ## Rollback Plan
 
 - All Xero changes are journal entries — reversible with counter-entries
-- Sheets restructuring done in new columns/tabs — old structure preserved
-- Contact creation is additive
-- No deployed code changes — all Claude Code workflows
+- Sheets restructuring in new tabs — old tabs preserved during parallel run
+- Apps Script changes logged — can revert to previous version in Apps Script editor
+- Contact creation is additive — no destructive changes
+- Orbit code changes (CPL fix) are a single-line edit — trivial revert
 
 ## Definition of Done
 
@@ -281,7 +379,9 @@ Trigger: "Reconcile {month}" in Claude Code
 - [ ] Personal card expenses journaled; equity reclassified
 - [ ] Accrual adjustments in place (prepaid amortization, expense matching)
 - [ ] Sheets P&L mirrors Xero structure with Forecast + Actual columns
-- [ ] Monthly reconciliation workflow tested and documented
-- [ ] COGS labor allocation workflow (Orbit → Xero) tested
+- [ ] IRR/LTV/Scorecard tabs updated and validated against new P&L structure
+- [ ] Apps Script updated to write Orbit data to new Sheets structure
+- [ ] Monthly reconciliation + COGS allocation workflows tested and documented
+- [ ] CPL formula cleaned up in Orbit
 - [ ] Xero is the single source of truth; Orbit is the planning interface
 - [ ] Linear CLA-135 moved to Done
