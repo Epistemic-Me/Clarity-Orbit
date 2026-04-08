@@ -1,232 +1,287 @@
 # PR #5: xero-financial-reconciliation - Plan
 
 **Created**: 2026-04-07
-**Updated**: 2026-04-08
+**Updated**: 2026-04-08 (v3 — reordered: Xero accrual first, then Sheets alignment, then workflows)
 **Based on**: [RESEARCH.md](./RESEARCH.md)
 **Branch**: `feature/pr-5-xero-financial-reconciliation`
 **Linear**: CLA-135
 
 ## Chosen Approach
 
-Hybrid: Claude Code conversational workflows (Xero MCP + Google Workspace MCP) that clean up Xero classifications, journal personal card expenses, and write actuals into the Sheets financial model. Phase 0 added to fix Xero data quality before reconciliation.
+**Xero-first, accrual-basis accounting.** Fix Xero to be the source of truth with proper COGS, expense classification, accrual adjustments, and equity realization. Then restructure the Sheets P&L to mirror Xero's account hierarchy. Then build reconciliation workflows. Orbit remains the planning interface for IRR/resource allocation, reading from the aligned Sheets model.
 
 ## Scope
 
 ### In Scope
-- **Phase 0:** Xero cleanup — reclassify revenue, break up Professional Fees, journal personal card expenses, reclassify convertible note, create missing contacts
-- **Phase 1:** Monthly P&L reconciliation workflow (Xero actuals vs Sheets forecast)
-- **Phase 2:** Invoice generation from Orbit lock-in data
-- **Phase 3:** Cash position / runway sync from Xero → Sheets
-- **Phase 4:** Expense drift detection (personal cards vs Xero vs Sheets budget)
-- **Phase 5:** Update Sheets financial model with actuals
-- **Phase 6:** Workflow runbook documentation
+- **Phase 0:** Xero accounting standards — COGS setup, accrual adjustments, expense reclassification, equity realization, missing contacts
+- **Phase 1:** Sheets P&L restructuring — mirror Xero's Revenue → COGS → Gross Margin → OpEx → Net Income structure
+- **Phase 2:** Monthly reconciliation workflow — Xero actuals → Sheets actuals columns
+- **Phase 3:** Invoice generation, cash pulse, expense audit workflows
+- **Phase 4:** Workflow runbook documentation
 
 ### Out of Scope
-- Automated scheduling (cron/triggers) — manual Claude Code commands for now
-- Orbit UI changes — no new buttons or views in the React app
+- Automated scheduling — manual Claude Code commands for now
+- Orbit UI changes — Orbit reads from Sheets, no new views needed
 - Payroll automation — Rippling handles payroll, Xero records it
 - Multi-currency support
-- Stripe → Xero reconciliation (future work)
 
 ## Technical Design
 
-### Phase 0: Xero Cleanup
+### Phase 0: Xero Accounting Standards
 
-#### 0a. Revenue Reclassification
-Reclassify $112,795 from Sale of Goods (4000) → Service Revenue (4100). EM sells consulting services, not goods.
-- **Method:** Manual journal entries or invoice edits in Xero
-- **Risk:** Low — accounting reclassification, no cash impact
+The goal is to produce accurate monthly P&L reports from Xero with this structure:
+```
+Revenue → COGS → Gross Profit (margin %) → OpEx → Net Income (margin %)
+```
 
-#### 0b. Break Up Professional Fees ($97,400)
-Current state: Account 6290 lumps together 1099 contractor comp, QA, social media, and actual professional fees.
+#### 0a. COGS Setup & Contractor Allocation
 
-**Target classification:**
-| What | Current Account | Target Account | Monthly Amount |
-|------|----------------|----------------|----------------|
-| Robert 1099 comp | Professional Fees (6290) | Contract Labor (6090) | $4-14K/mo |
-| Jonathan 1099 comp | Professional Fees (6290) | Contract Labor (6090) | $9-14K/mo |
-| QA contractor (ThirstySprout) | Professional Fees (6290) | Contract Labor (6090) | $1,400-2,800/mo |
-| Social media (Contra/Benjamin) | Professional Fees (6290) | Advertising (6000) | ~$4,800/mo |
-| Actual professional fees | Professional Fees (6290) | Professional Fees (6290) | Keep here |
+**Problem:** All expenses are in operating expense accounts. No COGS means gross margin = 100%, which is meaningless for a services business.
 
-- **Method:** Journal entries: Debit target accounts, Credit 6290
-- **Risk:** Medium — need to identify exact amounts per category from bank transactions
+**Direct costs (COGS) for EM:**
+| Cost | Account | Code | Basis |
+|------|---------|------|-------|
+| Robert — client delivery hours | Cost of Goods Sold - Labor | 5100 | % of hours on Dayforce/Mystica (from Orbit) |
+| Jonathan — client delivery hours | Cost of Goods Sold - Labor | 5100 | % of hours on Dayforce/Mystica (from Orbit) |
+| QA contractor (ThirstySprout) | Cost of Goods Sold - Labor | 5100 | 100% client delivery |
+| AI/ML API costs | Cost of Goods Sold | 5000 | Direct cost of service delivery |
+| Client-facing hosting | Cost of Goods Sold | 5000 | Portion serving Dayforce/Mystica |
 
-#### 0c. Journal Personal Card Expenses ($11,301)
-182 transactions on personal cards (5071, 3605, 4262) need to be entered.
+**Accrual method for labor COGS:**
+1. Each month, pull Orbit lock-in data for hours by opportunity
+2. Calculate % of Robert/Jonathan hours on client-billable work (inner + middle ring)
+3. Allocate that % of their monthly comp to COGS (5100)
+4. Remainder stays in OpEx as R&D/platform investment
 
-**Category mapping to Xero accounts:**
-| Expense Sheet Category | Xero Account | Code |
-|----------------------|-------------|------|
-| AI/ML Subscriptions | Dues and Subscriptions | 6110 |
-| AI/ML APIs | Cost of Goods Sold | 5000 |
-| Dev Tools, Dev Tools/Security | Software & Web | 6340 |
-| Hosting | Software & Web | 6340 |
-| Team Tools (Slack/Google) | Software & Web | 6340 |
-| Sales/Marketing, Sales/CRM | Advertising | 6000 |
+**Example — March 2026:**
+- Robert: 55h total, 35h on Dayforce+Mystica = 64% → $5K total comp × 64% = $3,200 COGS
+- Jonathan: 47h total, 40h on Dayforce+Mystica = 85% → $15K total comp × 85% = $12,750 COGS
+- QA: 15h all client work = 100% → $2,800 COGS
+- Total COGS labor: $18,750
+- Revenue: ~$46K → **Gross margin: ~59%**
+
+#### 0b. Revenue Reclassification
+
+Reclassify $112,795 from Sale of Goods (4000) → Service Revenue (4100).
+- All current revenue is services (Dayforce consulting, Mystica retainer + profit share)
+- Future software revenue (Clarity Builder, PEPM) will go to a new **Software Revenue** account when it materializes
+
+#### 0c. Break Up Professional Fees ($97,400)
+
+| What | From | To | Code |
+|------|------|----|------|
+| Robert & Jonathan 1099 comp | Professional Fees (6290) | Contract Labor (6090) | Then split COGS/OpEx per 0a |
+| QA contractor (ThirstySprout) | Professional Fees (6290) | COGS - Labor (5100) | 100% direct |
+| Social media (Contra/Benjamin) | Professional Fees (6290) | Advertising (6000) | Marketing expense |
+| Actual professional fees only | Stay in 6290 | Stay in 6290 | Legal, accounting, etc. |
+
+#### 0d. Journal Personal Card Expenses ($11,301)
+
+Debit various expense accounts, Credit Due to Director (820):
+
+| Category | Xero Account | Code |
+|----------|-------------|------|
+| AI/ML APIs (Anthropic, OpenAI, Moonshot, Kimi) | Cost of Goods Sold | 5000 |
+| AI/ML Subscriptions (Claude, ChatGPT) | Dues and Subscriptions | 6110 |
+| Hosting, Dev Tools, Team Tools, Domain, Email | Software & Web | 6340 |
+| Sales/Marketing, Community (ACQ), Social, Content | Advertising | 6000 |
 | Business Services, Legal, Tax, HR | Professional Fees | 6290 |
-| Domain | Software & Web | 6340 |
-| Email Service | Software & Web | 6340 |
-| Contractor - Social Media | Advertising | 6000 |
-| Community Membership (ACQ) | Advertising | 6000 |
-| Content/Video, AI Video | Advertising | 6000 |
 | Internet, Coworking | Telephone and Internet | 6390 |
 
-- **Method:** Journal entry: Debit various expense accounts $11,301, Credit Due to Director (820) $11,301
-- **Note:** This increases 820 from $32,475 to $43,776
-- **Risk:** Low — standard director expense reimbursement accounting
+#### 0e. Equity Reclassification
 
-#### 0d. Equity Reclassification
-Move $32,475 from Account 820 (Due to Director) → Additional Paid In Capital (3200).
-Robert's capital injections are an equity purchase, not a loan or convertible note. No note agreement exists.
-- **Method:** Journal entry: Debit 820 $32,475, Credit 3200 $32,475
-- **Note:** After 0c journaling, 820 will have $43,776. Only the original $32,475 moves to equity. The $11,301 personal card reimbursement stays in 820 as a true director reimbursement.
-- **Risk:** Low — straightforward equity classification
+Journal: Debit Due to Director (820) $32,475 → Credit Additional Paid In Capital (3200) $32,475.
+Robert's capital injections are an equity purchase. After 0d, 820 will have $43,776; only the $32,475 moves to equity, $11,301 stays as director reimbursement.
 
-#### 0e. Create Missing Contacts
+#### 0f. Accrual Adjustments
+
+**Prepaid expenses:** Amortize large annual payments monthly:
+- Namecheap domain ($550 paid Sep'25) → $46/mo over 12 months
+- 1Password ($239 paid Aug'25) → $20/mo over 12 months
+
+**Accrued expenses:** If a contractor works in month N but is paid in month N+1, the expense accrues in month N.
+
+**Revenue recognition:** Revenue recognized when service is delivered, regardless of payment timing. Dayforce $25K is the month's revenue even if payment arrives Net-30.
+
+#### 0g. Create Missing Contacts
+
 | Contact | Type | Purpose |
 |---------|------|---------|
-| Relationship Psychics | Customer | Mystica's legal entity — retainer + profit share invoicing |
-| Contra / Benjamin | Supplier | Social media contractor (final payment Mar'26) |
-| Anthropic | Supplier | AI API and subscription costs |
-| Intapp | Customer | Closing within 2 weeks (~Apr 22) — need contact + invoice template ready |
+| Relationship Psychics | Customer | Mystica's legal entity |
+| Contra / Benjamin | Supplier | Social media (ended Mar'26) |
+| Anthropic | Supplier | AI API + subscriptions |
+| Intapp | Customer | Closing ~Apr 22 |
 
-#### 0f. COGS Setup
-Move AI/ML API costs ($1,036 from expense sheet) to Cost of Goods Sold (5000).
-Move hosting costs ($1,371 from expense sheet) to COGS or keep in Software & Web with tracking.
-- **Why:** These are direct costs of delivering services to Dayforce/Mystica, not overhead
+### Phase 1: Sheets P&L Restructuring
 
-### Phase 1-5: Reconciliation Workflows (unchanged approach)
+**Problem:** The current Sheets Monthly P&L has this structure:
+```
+Platform Revenue → Services Revenue → Reference Design Revenue → Total Revenue
+→ COGS (flat estimates) → Gross Profit → OpEx → Net Income
+```
 
-#### Workflow 1: Monthly Reconciliation
+This doesn't match Xero's chart of accounts. The categories are different, the line items don't align, and there's no way to drop Xero actuals directly into the model.
+
+**Fix:** Restructure Sheets Monthly P&L to match Xero's account hierarchy:
+
+```
+SERVICE REVENUE
+  Dayforce Contract Revenue (4100)
+  Mystica Retainer (4100)
+  Mystica Profit Share (4100)
+  Sprint Zero / Impl Readiness (4100)
+  Other Agency Retainers (4100)
+SOFTWARE REVENUE (future)
+  PEPM Profit Share
+  Clarity Builder Subscriptions
+TOTAL REVENUE
+
+COST OF GOODS SOLD
+  Contract Labor — COGS portion (5100)
+  AI/ML API Costs (5000)
+  Client Hosting (5000)
+TOTAL COGS
+
+GROSS PROFIT
+GROSS MARGIN %
+
+OPERATING EXPENSES
+  Contract Labor — non-COGS portion (6090)
+  Wages & Salaries - W2 (6450)
+  Payroll Taxes (6360)
+  Advertising & Marketing (6000)
+  Software & Web (6340)
+  Dues & Subscriptions (6110)
+  Professional Fees (6290)
+  Telephone & Internet (6390)
+  Bank Fees (6030)
+  Filing & Registration (525)
+TOTAL OPEX
+
+NET INCOME
+NET MARGIN %
+```
+
+Each month gets two columns: **Forecast** and **Actual**. Actuals populated from Xero via reconciliation workflow.
+
+Also restructure:
+- **Balance Sheet** → populate from Xero balance sheet report
+- **Runway & KPIs** → wire to Xero actuals (real cash, AR, AP)
+- **Expense Detail** → replace flat budgets with Xero-derived actuals
+
+### Phase 2: Monthly Reconciliation Workflow
+
 ```
 Trigger: "Reconcile {month}" in Claude Code
-1. Pull Xero P&L for period (list-profit-and-loss)
+1. Pull Xero P&L for period (list-profit-and-loss --fromDate --toDate)
 2. Pull Xero balance sheet (list-report-balance-sheet)
-3. Read Sheets Monthly P&L forecast columns
-4. Compare actuals vs forecast, produce variance report
-5. Write actuals into Sheets "Actual" columns
+3. Map Xero accounts to Sheets rows (account code → row mapping)
+4. Write actuals into Sheets "Actual" columns for that month
+5. Calculate variances (actual - forecast) automatically via Sheet formulas
+6. Produce summary: gross margin %, net margin %, key variances
 ```
 
-#### Workflow 2: Invoice from Lock-Ins
-```
-Trigger: "Generate invoices for {month}" in Claude Code
-1. Read Orbit:LockInLog from Sheets
-2. Sum hours by client for billing period
-3. Dayforce: $25K flat (create-invoice)
-4. Mystica: $13K retainer + calculated profit share (create-invoice)
-5. Create as DRAFT for human review
-```
+### Phase 3: Supporting Workflows
 
-#### Workflow 3: Cash Pulse
+**Invoice from Lock-Ins:**
 ```
-Trigger: "Cash position" in Claude Code
-1. Pull Xero bank balance (list-report-balance-sheet)
-2. Pull AR (list-aged-receivables-by-contact) — currently $75K Dayforce
-3. Pull AP (list-aged-payables-by-contact)
-4. Write to Sheets Runway & KPIs: real cash, AR, AP
-5. Flag overdue invoices
+1. Read Orbit:LockInLog for the month
+2. Sum hours by client
+3. Create DRAFT invoices in Xero (Dayforce $25K, Mystica $13K + profit share)
+4. Human reviews and approves
 ```
 
-#### Workflow 4: Expense Audit
+**Cash Pulse:**
 ```
-Trigger: "Audit expenses for {month}" in Claude Code
-1. Pull Xero bank transactions for period
-2. Read expense sheet for same period
-3. Read Sheets Expense Detail budgets
-4. Three-way compare: Xero actuals vs expense sheet vs budget
-5. Flag variances > 10%, missing entries, uncategorized items
+1. Pull Xero bank balance, AR aging, AP aging
+2. Update Sheets Runway & KPIs
+3. Flag overdue invoices
 ```
 
-### Changes Required
+**Expense Audit:**
+```
+1. Pull Xero transactions for period
+2. Read expense sheet (personal card transactions)
+3. Three-way compare: Xero vs expense sheet vs Sheets budget
+4. Flag variances, missing entries, uncategorized items
+```
 
-| Target | Change | Why |
-|--------|--------|-----|
-| Xero: Revenue accounts | Reclassify 4000 → 4100 | Services, not goods |
-| Xero: Professional Fees | Break $97K into 6090/6000/6290 | Accurate comp vs marketing vs professional fees |
-| Xero: Account 820 | Journal $11K personal expenses, reclassify $32K to 2550 | Director reimbursement + convertible note |
-| Xero: Contacts | Add Mystica, Contra, Anthropic, Intapp | Missing from ledger |
-| Xero: COGS | Categorize AI APIs as direct costs | Accurate gross margin |
-| Sheets: Monthly P&L | Add "Actual" columns alongside forecast | Variance tracking |
-| Sheets: Expense Detail | Replace budgets with actuals-derived amounts | Accurate burn tracking |
-| Sheets: Runway & KPIs | Wire to Xero actuals (cash, AR, AP) | Real-time financial health |
-| Sheets: Balance Sheet | Populate from Xero balance sheet | Currently all $0s |
-
-### New Files
-
-| File | Purpose |
-|------|---------|
-| `docs/workflows/monthly-reconciliation.md` | Runbook for monthly close |
-| `docs/workflows/invoice-generation.md` | Runbook for lock-in → invoice |
-| `docs/workflows/cash-pulse.md` | Runbook for cash position check |
-| `docs/workflows/expense-audit.md` | Runbook for three-way expense comparison |
-| `docs/workflows/xero-mcp-setup.md` | Setup guide: Custom Connection, scope patch, 1Password |
+**COGS Labor Allocation (monthly):**
+```
+1. Pull Orbit lock-in hours for the month
+2. Calculate client-work % for Robert & Jonathan
+3. Journal COGS allocation in Xero (Debit 5100, Credit 6090)
+4. This is the key input for accurate gross margin
+```
 
 ## Implementation Order
 
-1. **Phase 0a:** Revenue reclassification (Sale of Goods → Service Revenue)
-2. **Phase 0b:** Break up Professional Fees into Contract Labor + Advertising
-3. **Phase 0c:** Journal personal card expenses ($11,301) → Account 820
-4. **Phase 0d:** Reclassify equity ($32,475) → Additional Paid In Capital (3200)
-5. **Phase 0e:** Create missing contacts (Mystica, Contra, Anthropic, Intapp)
-6. **Phase 0f:** Set up COGS tracking for AI APIs + hosting
-7. **Phase 1:** Build and test monthly P&L reconciliation workflow
-8. **Phase 2:** Build lock-in → draft invoice generation workflow
-9. **Phase 3:** Build cash pulse workflow (Xero → Sheets Runway & KPIs)
-10. **Phase 4:** Build three-way expense audit workflow
-11. **Phase 5:** Update Sheets financial model with Xero actuals
-12. **Phase 6:** Document all workflows as runbooks
+### Priority 1: Xero Source of Truth
+1. **0a.** COGS account setup and initial labor allocation
+2. **0b.** Revenue reclassification (Sale of Goods → Service Revenue)
+3. **0c.** Break up Professional Fees → Contract Labor + Advertising
+4. **0d.** Journal personal card expenses ($11,301) → Account 820
+5. **0e.** Equity reclassification ($32,475) → APIC (3200)
+6. **0f.** Accrual adjustments (prepaid amortization, expense matching)
+7. **0g.** Create missing contacts (Relationship Psychics, Intapp)
+
+### Priority 2: Sheets Alignment
+8. Restructure Sheets Monthly P&L to mirror Xero account hierarchy
+9. Add Forecast + Actual column pairs per month
+10. Restructure Balance Sheet, Runway & KPIs to pull from Xero
+11. Replace Expense Detail budgets with actuals-derived numbers
+
+### Priority 3: Workflow Automation
+12. Build monthly reconciliation workflow (Xero → Sheets)
+13. Build COGS labor allocation workflow (Orbit hours → Xero journal)
+14. Build invoice generation workflow (lock-ins → Xero DRAFT)
+15. Build cash pulse + expense audit workflows
+16. Document all workflows as runbooks
 
 ## Testing Strategy
 
-### Phase 0: Xero Cleanup Validation
-- [x] `list-accounts`: Verified 119 accounts, identified correct target accounts
-- [x] `list-contacts`: Verified 11 contacts, identified 4 missing
-- [x] `list-invoices`: Verified 10 invoices (1 paid, 1 authorised, 8 voided Rippling)
-- [x] `list-profit-and-loss`: Verified $189K revenue, $110K expenses, $79K net income
-- [x] `list-report-balance-sheet`: Verified $36K cash, $75K AR, $32K director loan
-- [x] `list-bank-transactions`: Verified Chase transactions (Rippling, ThirstySprout, Slack, Xero, Gov)
-- [ ] After reclassification: P&L shows $0 in Sale of Goods, all in Service Revenue
-- [ ] After breakup: Professional Fees < $10K, Contract Labor shows comp amounts
-- [ ] After journaling: Account 820 increased by $11,301
-- [ ] After equity reclassification: 820 reduced by $32,475, Additional Paid In Capital (3200) shows $32,475
-- [ ] Missing contacts created and verified
+### Phase 0: Xero Accounting Validation
+- [x] Baseline Xero state documented (P&L, balance sheet, trial balance)
+- [ ] COGS accounts (5000, 5100) have entries; gross margin < 100%
+- [ ] Revenue: $0 in Sale of Goods, all in Service Revenue (4100)
+- [ ] Professional Fees < $5K (only actual legal/accounting fees remain)
+- [ ] Contract Labor (6090) shows founder + QA comp
+- [ ] Advertising (6000) shows social media + ACQ + marketing
+- [ ] Account 820 has $11,301 director reimbursement
+- [ ] APIC (3200) has $32,475 equity
+- [ ] Prepaid amortization entries created for annual subscriptions
+- [ ] **Monthly P&L from Xero shows explicit gross margin per month**
 
-### Phase 1-4: Workflow Validation
-- [ ] Monthly reconciliation: Run for Mar'26, verify actuals match Xero, variances flagged
-- [ ] Invoice generation: Generate Dayforce Apr invoice, verify $25K amount and contact
-- [ ] Cash pulse: Verify $36,458 cash, $75K AR populate Runway & KPIs
-- [ ] Expense audit: Three-way compare catches known discrepancies (tooling budget $649 vs $1,100 actual)
+### Phase 1: Sheets Model Validation
+- [ ] Sheets P&L structure matches Xero account hierarchy
+- [ ] Revenue → COGS → Gross Margin → OpEx → Net Income flows correctly
+- [ ] Each month has Forecast + Actual columns
+- [ ] Balance Sheet populated from Xero ($111K assets, $32K liabilities)
+- [ ] Runway & KPIs wired to real Xero data
 
-### Phase 5: Sheets Model Validation
-- [ ] Monthly P&L actual columns match Xero P&L report
-- [ ] Balance Sheet populated: $111K assets, $32K liabilities, $79K equity
-- [ ] Runway & KPIs shows real cash ($36K), real AR ($75K), calculated runway
-- [ ] Expense Detail reflects actual category spending, not budgeted
-
-### End-to-End
-- [ ] Full monthly close: lock-in → invoice → Xero sync → reconcile → Sheets update
-- [ ] Financial model and Xero agree on all major line items
+### Phase 2-3: Workflow Validation
+- [ ] Monthly reconciliation: run for Mar'26, actuals populate Sheets correctly
+- [ ] COGS allocation: Orbit hours drive labor COGS split in Xero
+- [ ] Invoice generation: DRAFT invoice matches expected amounts
+- [ ] Cash pulse: real bank balance, AR, AP in Sheets
+- [ ] Gross margin % consistent between Xero report and Sheets model
 
 ## Rollback Plan
 
-- All Xero journal entries can be reversed with counter-entries
-- Revenue reclassification is journal entries — reversible
-- Contact creation is additive — no destructive changes
-- Sheet changes are additive (new columns) — existing formulas unaffected
-- All workflows are Claude Code commands — no deployed code dependencies
-- Git revert of documentation changes if needed
+- All Xero changes are journal entries — reversible with counter-entries
+- Sheets restructuring done in new columns/tabs — old structure preserved
+- Contact creation is additive
+- No deployed code changes — all Claude Code workflows
 
 ## Definition of Done
 
-- [ ] Xero revenue correctly classified as Service Revenue
+- [ ] Xero produces accurate monthly P&L with **Revenue → COGS → Gross Margin → OpEx → Net Income**
+- [ ] Gross margin calculated explicitly each month (target: track 55-65% range)
 - [ ] Professional Fees broken into Contract Labor + Advertising + actual fees
-- [ ] Personal card expenses journaled to correct accounts
-- [ ] Equity reclassified to Additional Paid In Capital (3200)
-- [ ] Missing contacts created
-- [ ] COGS tracking operational
-- [ ] All 4 workflows tested against real data
-- [ ] Sheets financial model reflects Xero actuals
-- [ ] Runbook documentation complete
-- [ ] GitHub PR reviewed and merged
+- [ ] Personal card expenses journaled; equity reclassified
+- [ ] Accrual adjustments in place (prepaid amortization, expense matching)
+- [ ] Sheets P&L mirrors Xero structure with Forecast + Actual columns
+- [ ] Monthly reconciliation workflow tested and documented
+- [ ] COGS labor allocation workflow (Orbit → Xero) tested
+- [ ] Xero is the single source of truth; Orbit is the planning interface
 - [ ] Linear CLA-135 moved to Done
