@@ -3,7 +3,7 @@
 **Status**: Not Started
 **Based on**: [PLAN.md](./PLAN.md)
 **Branch**: `feature/pr-5-xero-financial-reconciliation`
-**GitHub PR**: {to be filled when PR created}
+**GitHub PR**: https://github.com/Epistemic-Me/Clarity-Orbit/pull/5
 **Linear**: CLA-135
 
 ## Summary
