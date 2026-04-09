@@ -1,14 +1,23 @@
 # PR #5: xero-financial-reconciliation - Plan
 
 **Created**: 2026-04-07
-**Updated**: 2026-04-08 (v4 — added Orbit integration, Apps Script, historical restatement, transition plan)
+**Updated**: 2026-04-08 (v5 — dollar-for-dollar reconciliation, CAC tracking, accrual success criteria)
 **Based on**: [RESEARCH.md](./RESEARCH.md)
 **Branch**: `feature/pr-5-xero-financial-reconciliation`
 **Linear**: CLA-135
 
+## Success Criteria
+
+> Everything is accounted for. You can look at the monthly P&L. You can calculate what our margins are and should be.
+
+1. **Dollar-for-dollar reconciliation** — Xero monthly P&L and the Sheets Actual columns must match on every single cell. Zero tolerance. If Xero says Service Revenue was $46,000 in March, the Sheets Actual column for March says $46,000. Not $46K. Not "approximately." The exact number.
+2. **Accrual accounting** — Revenue recognized when earned, expenses when incurred. Not when cash moves.
+3. **Margin visibility** — Gross margin and net margin calculated explicitly each month. COGS properly separated from OpEx.
+4. **CAC trackable** — Community, content, and marketing costs rolled up as customer acquisition cost. Not buried in Professional Fees or generic Advertising.
+
 ## Chosen Approach
 
-**Xero-first, accrual-basis accounting.** Fix Xero to be the source of truth with proper COGS, expense classification, accrual adjustments, and equity realization. Then restructure the Sheets P&L to mirror Xero's account hierarchy. Then build reconciliation workflows. Orbit remains the planning interface for IRR/resource allocation — its code doesn't change, but the Apps Script bridge and Sheets structure it reads from do.
+**Xero-first, accrual-basis accounting.** Fix Xero to be the source of truth with proper COGS, expense classification, accrual adjustments, and equity realization. Then restructure the Sheets P&L to match Xero's chart of accounts **cell-for-cell** — same account codes, same line items, same numbers. Then build reconciliation workflows that enforce this match monthly. Orbit remains the planning interface for IRR/resource allocation — its code doesn't change, but the Apps Script bridge and Sheets structure it reads from do.
 
 ## Scope
 
@@ -103,7 +112,9 @@ Debit various expense accounts, Credit Due to Director (820):
 | AI/ML APIs (Anthropic, OpenAI, Moonshot, Kimi) | Cost of Goods Sold | 5000 |
 | AI/ML Subscriptions (Claude, ChatGPT) | Dues and Subscriptions | 6110 |
 | Hosting, Dev Tools, Team Tools, Domain, Email | Software & Web | 6340 |
-| Sales/Marketing, Community (ACQ), Social, Content | Advertising | 6000 |
+| Sales/Marketing (Instantly, Apollo) | Advertising — CAC | 6000 |
+| Community (ACQ) | Advertising — CAC | 6000 |
+| Social media, Content/Video | Advertising — CAC | 6000 |
 | Business Services, Legal, Tax, HR | Professional Fees | 6290 |
 | Internet, Coworking | Telephone and Internet | 6390 |
 
@@ -114,13 +125,33 @@ Robert's capital injections are an equity purchase. After 0d, 820 will have $43,
 
 #### 0f. Accrual Adjustments
 
-**Prepaid expenses:** Amortize large annual payments monthly:
-- Namecheap domain ($550 paid Sep'25) → $46/mo over 12 months
-- 1Password ($239 paid Aug'25) → $20/mo over 12 months
+Moving from implicit cash-basis to proper accrual accounting. Every line item has a clear recognition rule:
 
-**Accrued expenses:** If a contractor works in month N but is paid in month N+1, the expense accrues in month N.
+**Revenue recognition (when earned, not when paid):**
+| Revenue | Recognition Rule |
+|---------|-----------------|
+| Dayforce $25K/mo | Recognized in the month services are delivered. Invoice dated end-of-month. Payment arrives Net-30 — irrelevant to P&L timing. |
+| Mystica $13K retainer | Recognized monthly when services delivered. |
+| Mystica profit share | Recognized when calculated (monthly), regardless of payment timing. |
+| Sprint Zero | Recognized in the month the sprint is delivered. |
 
-**Revenue recognition:** Revenue recognized when service is delivered, regardless of payment timing. Dayforce $25K is the month's revenue even if payment arrives Net-30.
+**Expense recognition (when incurred, not when paid):**
+| Expense | Recognition Rule |
+|---------|-----------------|
+| Robert/Jonathan 1099 comp | Accrued in the month work is performed. If Rippling pays on the 25th for work done all month, the full month accrues. |
+| W2 wages | Accrued per pay period in the month worked. |
+| QA contractor (ThirstySprout) | Accrued in the month work is performed, even if paid the following month. |
+| Social media contractor | Accrued in the month content is delivered. |
+| Annual subscriptions | Amortized monthly over the subscription period (not expensed when paid). |
+
+**Specific prepaid amortization entries:**
+- Namecheap domain ($550 paid Sep'25) → $46/mo over 12 months → Prepaid Expenses (1300) asset, amortized to Software & Web (6340)
+- 1Password ($239 paid Aug'25) → $20/mo over 12 months → Prepaid Expenses (1300) asset, amortized to Software & Web (6340)
+- Any future annual payment > $200 gets the same treatment
+
+**Accrued liabilities:**
+- If a contractor works in month N but invoice arrives in month N+1, book the expense in month N via: Debit expense account, Credit Accrued Expenses (2100)
+- Reverse the accrual when the actual invoice is received and paid
 
 #### 0g. Create Missing Contacts
 
@@ -137,51 +168,85 @@ Robert's capital injections are an equity purchase. After 0d, 820 will have $43,
 
 **Problem:** Current Sheets P&L uses custom categories (Platform Revenue / Services Revenue / Reference Design Revenue) that don't match Xero's chart of accounts. Actuals from Xero can't drop in without manual mapping.
 
-**Fix:** Restructure to mirror Xero:
+**Fix:** Restructure to mirror Xero **cell-for-cell**. Every line item maps to a Xero account code. No custom categories that don't exist in Xero.
 
 ```
 SERVICE REVENUE
-  Dayforce Contract Revenue (4100)
-  Mystica Retainer (4100)
-  Mystica Profit Share (4100)
-  Sprint Zero / Impl Readiness (4100)
-  Other Agency Retainers (4100)
+  Dayforce Contract Revenue ............... (4100)
+  Mystica Retainer ....................... (4100)
+  Mystica Profit Share ................... (4100)
+  Sprint Zero / Impl Readiness ........... (4100)
+  Other Agency Retainers ................. (4100)
 SOFTWARE REVENUE (future)
   PEPM Profit Share
   Clarity Builder Subscriptions
+─────────────────────────────────────────────────
 TOTAL REVENUE
 
 COST OF GOODS SOLD
-  Contract Labor — COGS portion (5100)
-  AI/ML API Costs (5000)
-  Client Hosting (5000)
+  Contract Labor — COGS portion .......... (5100)
+  AI/ML API Costs ........................ (5000)
+  Client Hosting ......................... (5000)
+─────────────────────────────────────────────────
 TOTAL COGS
 
 GROSS PROFIT
 GROSS MARGIN %
 
 OPERATING EXPENSES
-  Contract Labor — non-COGS portion (6090)
-  Wages & Salaries - W2 (6450)
-  Payroll Taxes (6360)
-  Advertising & Marketing (6000)
-  Software & Web (6340)
-  Dues & Subscriptions (6110)
-  Professional Fees (6290)
-  Telephone & Internet (6390)
-  Bank Fees (6030)
-  Filing & Registration (525)
-TOTAL OPEX
+  Contract Labor — R&D/platform .......... (6090)
+  Wages & Salaries - W2 .................. (6450)
+  Payroll Taxes .......................... (6360)
+  Software & Web ......................... (6340)
+  Dues & Subscriptions ................... (6110)
+  Professional Fees ...................... (6290)
+  Telephone & Internet ................... (6390)
+  Bank Fees .............................. (6030)
+  Filing & Registration .................. (525)
+─────────────────────────────────────────────────
+TOTAL OPEX (excl. CAC)
+
+CUSTOMER ACQUISITION COSTS (CAC)
+  Community Memberships (ACQ) ............ (6000)
+  Content Production (video, social) ..... (6000)
+  Social Media Agency .................... (6000)
+  Outbound Tools (Instantly, Apollo) ..... (6000)
+  Other Marketing ........................ (6000)
+─────────────────────────────────────────────────
+TOTAL CAC
+CAC / NEW CUSTOMER (if applicable)
+
+─────────────────────────────────────────────────
+TOTAL OPERATING EXPENSES (OpEx + CAC)
 
 NET INCOME
 NET MARGIN %
 ```
 
-Each month gets two columns: **Forecast** and **Actual**. Actuals populated from Xero via reconciliation workflow.
+**Column structure per month:**
+
+| | Forecast | Actual | Variance | Var % |
+|---|---|---|---|---|
+| Service Revenue | $46,000 | $46,000 | $0 | 0% |
+| ... | ... | ... | ... | ... |
+
+- **Forecast**: manually maintained forward-looking plan
+- **Actual**: populated from Xero via reconciliation workflow (must match Xero to the dollar)
+- **Variance**: `=Actual - Forecast` (Sheet formula)
+- **Var %**: `=Variance / Forecast` (Sheet formula)
+
+**Reconciliation check row at bottom of each month:**
+```
+XERO P&L NET INCOME .................... $X,XXX    ← pulled from Xero
+SHEETS ACTUAL NET INCOME ............... $X,XXX    ← sum of Actual column
+RECONCILIATION DELTA ................... $0        ← MUST BE ZERO
+```
+
+If the delta is non-zero, something is miscategorized or missing. This is the enforcement mechanism for dollar-for-dollar accuracy.
 
 Also restructure:
-- **Balance Sheet** → populate from Xero balance sheet report
-- **Runway & KPIs** → wire to Xero actuals (real cash, AR, AP)
+- **Balance Sheet** → populate from Xero balance sheet report (must match Xero)
+- **Runway & KPIs** → wire to Xero actuals (real cash, AR, AP) + add CAC metrics
 - **Expense Detail** → replace flat budgets with Xero-derived actuals per category
 
 #### 1b. Apps Script Update
@@ -212,16 +277,27 @@ Also restructure:
 
 ### Phase 2: Reconciliation Workflows
 
-#### Monthly Reconciliation (Xero → Sheets)
+#### Monthly Reconciliation (Xero → Sheets) — Dollar-for-Dollar
 ```
 Trigger: "Reconcile {month}" in Claude Code
+
 1. Pull Xero P&L for period (list-profit-and-loss --fromDate --toDate --timeframe MONTH)
 2. Pull Xero balance sheet (list-report-balance-sheet)
-3. Map Xero account codes to Sheets rows (defined mapping table)
-4. Write actuals into Sheets "Actual" columns for that month
-5. Calculate variances via Sheet formulas (actual - forecast)
-6. Produce summary: gross margin %, net margin %, top 3 variances
+3. Map each Xero account to its Sheets row using account code (defined mapping table)
+4. Write each Xero line item into the Sheets "Actual" column for that month
+5. Sum Sheets Actual column → compute Sheets Net Income
+6. Compare Sheets Net Income vs Xero Net Income
+7. **RECONCILIATION CHECK: delta must be $0.00**
+   - If delta ≠ 0: identify which account is mismatched, fix before proceeding
+   - Common causes: missing journal entry, wrong account code, unreconciled transaction
+8. Once delta = 0, compute and report:
+   - Gross margin % (Revenue - COGS) / Revenue
+   - Net margin % (Net Income / Revenue)
+   - Total CAC and CAC per customer (if new customers acquired)
+   - Top 3 forecast variances by absolute dollar amount
 ```
+
+**The reconciliation check is non-negotiable.** Every cell in the Actuals column must trace back to a specific Xero account balance. If they don't add up, the books aren't clean.
 
 #### COGS Labor Allocation (Orbit → Xero)
 ```
@@ -353,10 +429,13 @@ This ensures zero downtime — the old model keeps working until the new one is 
 
 ### Phase 2-3: Workflow Validation
 - [ ] COGS allocation: Orbit hours drive labor COGS split in Xero
-- [ ] Monthly reconciliation: run for Apr'26, actuals populate Sheets correctly
+- [ ] Monthly reconciliation for Apr'26: **reconciliation delta = $0**
+- [ ] Every Xero account with a balance maps to exactly one Sheets row
+- [ ] Every Sheets Actual cell traces to a Xero account code
+- [ ] Gross margin % identical in Xero P&L report and Sheets model
+- [ ] CAC total in Sheets matches sum of Xero Advertising (6000) sub-entries
 - [ ] Invoice generation: DRAFT invoice matches expected amounts
 - [ ] Cash pulse: real bank balance, AR, AP in Sheets
-- [ ] Gross margin % consistent between Xero report and Sheets model
 
 ### Phase 4: Cleanup Validation
 - [ ] CPL formula updated (no hardcoded agency cost)
@@ -373,15 +452,21 @@ This ensures zero downtime — the old model keeps working until the new one is 
 
 ## Definition of Done
 
-- [ ] Xero produces accurate monthly P&L with **Revenue → COGS → Gross Margin → OpEx → Net Income**
-- [ ] Gross margin calculated explicitly each month (target: track 55-65% range)
-- [ ] Professional Fees broken into Contract Labor + Advertising + actual fees
-- [ ] Personal card expenses journaled; equity reclassified
-- [ ] Accrual adjustments in place (prepaid amortization, expense matching)
-- [ ] Sheets P&L mirrors Xero structure with Forecast + Actual columns
+### Non-Negotiable (must all pass)
+- [ ] **Reconciliation delta = $0** — Xero monthly P&L net income matches Sheets Actual column net income, to the penny, for Apr'26
+- [ ] **Gross margin visible** — explicit gross margin % calculated from COGS each month (expected range: 55-65%)
+- [ ] **Net margin visible** — explicit net margin % after all OpEx + CAC each month
+- [ ] **CAC tracked separately** — community, content, social, outbound tools rolled up as Customer Acquisition Cost with a total line
+- [ ] **Accrual-basis** — revenue recognized when earned, expenses when incurred, prepaid amortized monthly
+- [ ] **Every dollar accounted for** — no transactions in Xero that don't map to a Sheets row; no Sheets line items without a Xero account
+
+### Required
+- [ ] Professional Fees broken into Contract Labor + CAC + actual fees
+- [ ] Personal card expenses ($11,301) journaled to correct accounts
+- [ ] Equity ($32,475) reclassified to APIC (3200)
+- [ ] Sheets P&L structure matches Xero chart of accounts (same codes, same line items)
 - [ ] IRR/LTV/Scorecard tabs updated and validated against new P&L structure
 - [ ] Apps Script updated to write Orbit data to new Sheets structure
-- [ ] Monthly reconciliation + COGS allocation workflows tested and documented
-- [ ] CPL formula cleaned up in Orbit
+- [ ] Monthly reconciliation + COGS allocation workflows documented as runbooks
 - [ ] Xero is the single source of truth; Orbit is the planning interface
 - [ ] Linear CLA-135 moved to Done
