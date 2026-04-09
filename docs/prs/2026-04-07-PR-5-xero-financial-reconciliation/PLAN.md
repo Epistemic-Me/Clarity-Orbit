@@ -305,8 +305,97 @@ If the delta is non-zero, something is miscategorized or missing. This is the en
 
 Also restructure:
 - **Balance Sheet** → populate from Xero balance sheet report (must match Xero)
-- **Runway & KPIs** → wire to Xero actuals (real cash, AR, AP) + add CAC metrics
+- **Runway & KPIs** → wire to Xero actuals (real cash, AR, AP) + add CAC metrics + add revenue concentration
 - **Expense Detail** → replace flat budgets with Xero-derived actuals per category
+
+#### 1a-iii. 13-Week Cash Flow Forecast Tab (New)
+
+**Problem:** The monthly P&L tells you margin but not whether you can make payroll next Friday. With $36K cash and $75K in AR (three Dayforce invoices), a single late payment is a cash crisis. Monthly granularity hides weekly liquidity risk.
+
+**New Sheets tab: `13-Week Cash Flow`**
+
+```
+13-WEEK ROLLING CASH FORECAST
+
+                    Wk 1     Wk 2     Wk 3     Wk 4     Wk 5     ...   Wk 13
+                    4/7      4/14     4/21     4/28     5/5             7/7
+────────────────────────────────────────────────────────────────────────────────
+Starting Cash       $36,458  $34,223  $59,223  $56,988  $54,753
+
+CASH IN
+  Dayforce (Net-30)          $25,000                    $25,000
+  Mystica                             $13,000
+  Intapp (if closes)                           $30,000?
+  Other
+Total Cash In       $0       $25,000  $13,000  $30,000  $25,000
+
+CASH OUT
+  Rippling (payroll) $2,235                    $2,235
+  Rippling (1099)                     $28,000
+  QA (ThirstySprout)                  $2,800
+  Xero sub           $25
+  Other recurring              $200   $200     $200     $200
+Total Cash Out      $2,260   $200    $31,000  $2,435   $200
+
+NET CASH FLOW       -$2,260  $24,800  -$18,000 $27,565  $24,800
+
+ENDING CASH         $34,198  $59,023  $41,023  $68,588  $93,388
+
+────────────────────────────────────────────────────────────────────────────────
+ALERTS
+  Minimum cash threshold:     $10,000
+  Weeks until below threshold: N/A (healthy)
+  Overdue AR:                 $25,000 (Dayforce Feb invoice — XX days late)
+```
+
+**How it works:**
+- **Cash In**: known receivables by expected payment date (from Xero AR aging + payment history)
+- **Cash Out**: known payables by due date (Rippling schedule, contractor invoices, subscriptions)
+- **Updated weekly** as part of the morning cash check, or via Cash Pulse workflow
+- **Conditional deals** (Intapp) shown with `?` — not counted in the "safe" forecast until signed
+
+**Data sources:**
+- Starting cash: Xero bank balance (Chase)
+- AR timing: Xero aged receivables + historical payment patterns per client
+- AP timing: Rippling schedule (known), contractor terms (known), subscriptions (known)
+- Updated via Cash Pulse workflow or manually
+
+**Why this matters more than monthly P&L for survival:** You could have $100K/mo revenue and still miss payroll if the timing is wrong. The 13-week forecast is the CEO's "am I safe?" view.
+
+#### 1a-iv. Revenue Concentration Tracking (New — in Runway & KPIs)
+
+**Problem:** Dayforce is 54% of revenue. If they cancel, churn, or delay payment, the business is in immediate trouble. This risk isn't tracked anywhere.
+
+**Add to Runway & KPIs tab:**
+
+```
+REVENUE CONCENTRATION
+
+Metric                              Current    Target     Status
+────────────────────────────────────────────────────────────────
+Largest client % of revenue         54%        < 40%      ⚠️ HIGH
+Top 2 clients % of revenue          100%       < 70%      🚨 CRITICAL
+Number of clients                   2          5+         ⚠️ LOW
+Months since last new client        5          < 3        ⚠️
+
+CLIENT REVENUE BREAKDOWN
+
+Client              Monthly Rev    % of Total    Contract End    Risk
+────────────────────────────────────────────────────────────────────
+Dayforce             $25,000       54%           Ongoing         Payment timing
+Mystica (RP)         $21,293       46%           TBD Jun'26      Retainer renewal
+Intapp (pending)     $30,000       —             Not closed      35% probability
+────────────────────────────────────────────────────────────────────
+TOTAL                $46,293       100%
+
+AFTER INTAPP CLOSES (projected):
+Dayforce             $25,000       33%           ← drops below 40% target ✓
+Mystica              $21,293       28%
+Intapp               $30,000       39%
+TOTAL                $76,293
+```
+
+**Monitored monthly.** Revenue concentration improves mechanically with each new client. The KPI section flags when any single client exceeds 40% of revenue — that's the threshold where losing one client threatens the business.
 
 #### 1a-ii. CAC Tracker Tab (New)
 
@@ -511,11 +600,19 @@ Trigger: Run as part of monthly close, after COGS allocation + reconciliation
 4. Human reviews and approves
 ```
 
-**Cash Pulse:**
+**Cash Pulse (weekly or on-demand):**
 ```
-1. Pull Xero bank balance, AR aging, AP aging
-2. Update Sheets Runway & KPIs
-3. Flag overdue invoices
+Trigger: "Cash pulse" in Claude Code (or as part of morning check)
+
+1. Pull Xero bank balance (list-report-balance-sheet)
+2. Pull AR aging (list-aged-receivables-by-contact) — who owes what, how late
+3. Pull AP aging (list-aged-payables-by-contact) — what's due
+4. Update Sheets:
+   - Runway & KPIs: real cash, AR, AP, revenue concentration %
+   - 13-Week Cash Flow: refresh starting cash, update AR collection timing
+5. Flag: any invoice > 30 days overdue
+6. Flag: any week in 13-week forecast where ending cash < $10K threshold
+7. Report: "Cash: $X. AR: $X ($X overdue). Next 4 weeks: [safe/tight/critical]."
 ```
 
 **Expense Audit:**
@@ -577,11 +674,13 @@ This ensures zero downtime — the old model keeps working until the new one is 
 9. **1a.** Create new P&L tab mirroring Xero structure (parallel to old tab)
 10. Add Forecast + Actual + Variance + Var% column groups per month
 11. **1a-ii.** Create CAC Tracker tab (deal log, monthly activity, rolling metrics, trend)
-12. **1d.** Restructure ROI Scorecard tab (VPH by opportunity, imputed time CAC, blended ROI)
-13. Restructure Balance Sheet, Runway & KPIs (add CAC metrics to KPIs)
-14. **1b.** Update Apps Script to write to new structure
-15. Validate: run April reconciliation against both old and new tabs
-16. Cutover: swap tabs, update cross-references
+12. **1a-iii.** Create 13-Week Cash Flow Forecast tab (weekly cash in/out, alerts, minimum threshold)
+13. **1a-iv.** Add Revenue Concentration tracking to Runway & KPIs (largest client %, top 2 %, client count)
+14. **1d.** Restructure ROI Scorecard tab (VPH by opportunity, imputed time CAC, blended ROI)
+15. Restructure Balance Sheet, Runway & KPIs (add CAC + concentration metrics)
+16. **1b.** Update Apps Script to write to new structure
+17. Validate: run April reconciliation against both old and new tabs
+18. Cutover: swap tabs, update cross-references
 
 ### Priority 3: Workflow Automation (Phase 2-3)
 17. Build COGS labor allocation workflow (Orbit hours → Xero journal)
@@ -615,7 +714,9 @@ This ensures zero downtime — the old model keeps working until the new one is 
 - [ ] Revenue → COGS → Gross Margin → OpEx → Net Income flows correctly
 - [ ] Each month has Forecast + Actual columns
 - [ ] Balance Sheet populated from Xero ($111K assets)
-- [ ] Runway & KPIs wired to real Xero data
+- [ ] Runway & KPIs wired to real Xero data + revenue concentration metrics
+- [ ] 13-Week Cash Flow tab populated with known AR/AP, alerts functional
+- [ ] Revenue concentration: largest client %, top 2 %, flagged if > 40%/70%
 - [ ] Apps Script updated and tested — Orbit data writes to new structure
 - [ ] Old tab and new tab produce consistent totals
 
@@ -653,6 +754,8 @@ This ensures zero downtime — the old model keeps working until the new one is 
 - [ ] **Accrual-basis** — revenue recognized when earned, expenses when incurred, prepaid amortized monthly
 - [ ] **Every dollar accounted for** — no transactions in Xero that don't map to a Sheets row; no Sheets line items without a Xero account
 - [ ] **Every hour accounted for** — Orbit lock-in hours map to ROI Scorecard categories (delivery/R&D/sales/content/admin) with imputed cost and return
+- [ ] **13-week cash forecast operational** — weekly cash in/out visible, alerts for sub-$10K weeks, overdue AR flagged
+- [ ] **Revenue concentration tracked** — largest client % and top-2 % in Runway & KPIs, flagged when above thresholds
 
 ### Required
 - [ ] Professional Fees broken into Contract Labor + CAC + actual fees
