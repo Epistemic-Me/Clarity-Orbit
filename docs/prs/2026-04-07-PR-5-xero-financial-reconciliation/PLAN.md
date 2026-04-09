@@ -258,21 +258,28 @@ OPERATING EXPENSES
 ─────────────────────────────────────────────────
 TOTAL OPEX (excl. CAC)
 
-CUSTOMER ACQUISITION COSTS (CAC)
+CUSTOMER ACQUISITION COSTS (CAC — Cash)
   Community Memberships (ACQ) ............ (6000)
   Content Production (video, social) ..... (6000)
   Social Media Agency .................... (6000)
   Outbound Tools (Instantly, Apollo) ..... (6000)
   Other Marketing ........................ (6000)
 ─────────────────────────────────────────────────
-TOTAL CAC
-CAC / NEW CUSTOMER (if applicable)
+TOTAL CAC (Cash)
 
 ─────────────────────────────────────────────────
 TOTAL OPERATING EXPENSES (OpEx + CAC)
 
 NET INCOME
 NET MARGIN %
+
+MEMO: FULLY LOADED CAC (not in Xero — management view only)
+  CAC Cash (above) ....................... $X,XXX
+  Robert — Sales/Networking .............. $X,XXX  ← hours × $150 (from Orbit)
+  Robert — Content/Brand ................. $X,XXX  ← hours × $150 (from Orbit)
+─────────────────────────────────────────────────
+  FULLY LOADED CAC ....................... $X,XXX
+  FULLY LOADED CAC / CUSTOMER ........... $X,XXX
 ```
 
 **Column structure per month:**
@@ -301,6 +308,53 @@ Also restructure:
 - **Runway & KPIs** → wire to Xero actuals (real cash, AR, AP) + add CAC metrics
 - **Expense Detail** → replace flat budgets with Xero-derived actuals per category
 
+#### 1a-ii. CAC Tracker Tab (New)
+
+New Sheets tab that closes the loop between acquisition spend, founder time, and deal outcomes:
+
+```
+CUSTOMER ACQUISITION LOG
+
+Deal          | Close Date | Source Channel   | Cash CAC   | Time CAC   | Total CAC  | Contract Value | Payback
+--------------|-----------|------------------|------------|------------|------------|----------------|--------
+Dayforce      | Aug'25    | [source]         | $XXX       | $XXX       | $XXX       | $300K/yr       | X mo
+Mystica       | Nov'25    | [source]         | $XXX       | $XXX       | $XXX       | $156K/yr       | X mo
+Intapp        | Apr'26    | ACQ Community    | ~$9K       | ~$2,250    | ~$11,250   | $360K/yr       | < 1 mo
+
+MONTHLY ACQUISITION ACTIVITY
+
+Month   | Cash CAC  | Time CAC  | Fully Loaded | Warm Intros | Calls | Deals | Revenue Won
+--------|-----------|-----------|-------------|-------------|-------|-------|------------
+Apr'26  | $1,095    | $3,900    | $4,995      | 2           | 1     | 1     | $360K/yr
+May'26  | $X        | $X        | $X          |             |       |       |
+(filled monthly from Xero spend + Orbit hours + notes)
+
+ROLLING METRICS
+
+Total Lifetime Cash CAC:          $XX,XXX    ← sum of Xero Advertising (6000)
+Total Lifetime Time CAC:          $XX,XXX    ← sum of Orbit sales/content hours × $150
+Total Fully Loaded CAC:           $XX,XXX
+Total Customers:                  3
+Fully Loaded CAC/Customer:        $X,XXX
+Total Contract Revenue (ARR):     $816K
+LTV:CAC Ratio:                    XX:1
+
+CAC TREND (18-month projection)
+
+               Now          6mo          12mo
+Cash CAC/mo    $1,095       $1,000       $500
+Time CAC/mo    $3,900       $2,000       $1,000       ← less sales time as inbound grows
+Fully Loaded   $4,995       $3,000       $1,500
+CAC/Customer   $4,995       $1,500       $500         ← improving as flywheel compounds
+Content ROI    0.5x         2x           5x+
+```
+
+**Data sources:**
+- Cash CAC: Xero Advertising (6000) by tracking category
+- Time CAC: Orbit lock-in hours for sales + content activities × $150/hr
+- Deals/intros/calls: manual entry (you know your 3 customers by name)
+- Projected trend: maintained in forecast, updated monthly based on actual trajectory
+
 #### 1b. Apps Script Update
 
 **Problem:** The Apps Script (`Code.gs`, project ID `1Ea2gdGOSDr534PmA55NZ_GPEwHgcVJ5frcC-fVNjKTljDWP0x-S8a3f2`) maps Orbit data to specific Sheet rows/tabs. When we restructure the P&L, any row references in the Apps Script will break.
@@ -315,7 +369,7 @@ Also restructure:
 
 **Risk:** Medium — the Apps Script is not version-controlled. Read it first, make targeted changes.
 
-#### 1c. IRR / LTV / Scorecard Formula Audit
+#### 1c. IRR / LTV / Scorecard Formula Audit + ROI Scorecard Restructuring
 
 **Problem:** The Sheets model has `IRR by Channel`, `LTV Model`, `ROI Forecast`, and `ROI Scorecard` tabs that likely reference the current P&L structure via cell references or named ranges. Restructuring the P&L will break these formulas silently.
 
@@ -326,6 +380,72 @@ Also restructure:
 4. Verify calculations produce same results before/after
 
 **Risk:** High if ignored — broken formulas produce wrong numbers silently. Must audit before restructuring.
+
+#### 1d. ROI Scorecard — Rate of Return on Time
+
+**Problem:** Orbit tracks where every hour goes. Each hour has a known cost ($150/hr). But there's no view that shows the **return** on those hours — which activities generate revenue, which are strategic bets, and what's the blended ROI on the founders' time.
+
+**Restructure the `ROI Scorecard` tab to compute VPH (Value Per Hour) monthly:**
+
+```
+ROI SCORECARD — {Month} {Year}
+
+                              Hours   Imputed Cost   Revenue   VPH      ROI Multiple
+─────────────────────────────────────────────────────────────────────────────────────
+CLIENT DELIVERY (COGS)
+  Dayforce                    60h     $9,000         $25,000   $417     2.78x
+  Mystica                     50h     $7,500         $21,293   $426     2.84x
+  QA (ThirstySprout)          15h     $1,125         —         —        (allocated to above)
+Subtotal Delivery             125h    $17,625        $46,293   $370     2.63x
+
+R&D / PLATFORM (OpEx)
+  Clarity Growth              15h     $2,250         $0        $0       investment
+  Clarity Builder             10h     $1,500         $0        $0       investment
+Subtotal R&D                  25h     $3,750         $0        $0       investment
+
+SALES & ACQUISITION (CAC — Time)
+  Sales / Networking          10h     $1,500         *         *        pending close
+  Intapp Discovery            5h      $750           *         *        pending close
+Subtotal Sales                15h     $2,250         $0*       $0*      *realizes on deal close
+
+CONTENT & BRAND (CAC — Time)
+  Podcast                     8h      $1,200         $0        $0       flywheel (6-12mo)
+  SEO / Blog Engine           5h      $750           $0        $0       flywheel (3-6mo)
+  Social / Shorts             3h      $450           $0        $0       flywheel
+Subtotal Content              16h     $2,400         $0        $0       flywheel investment
+
+ADMIN / OTHER
+  Newsletter, misc            4h      $600           $0        $0       —
+─────────────────────────────────────────────────────────────────────────────────────
+TOTAL (Robert)                50h     $7,500
+TOTAL (Jonathan)              50h     $7,500
+TOTAL (QA)                    15h     $1,125
+
+BLENDED VPH                           $16,125        $46,293   $287     1.91x
+  excl. investment hours              $17,625        $46,293   $370     2.63x (delivery only)
+
+MEMO: Imputed CAC (founder time)
+  Robert — Sales/Networking ........... $1,500   (10h × $150)
+  Robert — Content/Brand .............. $2,400   (16h × $150)
+  Total imputed CAC (time) ............ $3,900
+  + Cash CAC (from Xero 6000) ......... $1,095
+  = FULLY LOADED CAC .................. $4,995
+```
+
+**Data sources:**
+- **Hours**: Orbit lock-in data (pulled from `Orbit:LockInLog` in Sheets)
+- **Imputed cost**: Hours × team member rate (from `Orbit:Team`)
+- **Revenue**: Xero actuals for the month (from reconciliation)
+- **VPH**: Revenue / Hours (Sheet formula)
+- **ROI Multiple**: VPH / cost per hour (Sheet formula)
+
+**Key metrics surfaced:**
+- Delivery VPH: are we profitable on client work? (target: > $150 = above cost)
+- Blended VPH: across all activities, is our time generating positive returns?
+- Imputed CAC: the real cost of sales/marketing including founder time
+- Fully loaded CAC: cash spend + imputed time = the true acquisition investment
+
+**This connects Orbit's time tracking directly to financial outcomes.** When Robert asks "what's the return on my time?" the answer is one glance at this scorecard.
 
 ### Phase 2: Reconciliation Workflows
 
@@ -362,7 +482,24 @@ Trigger: "Allocate COGS for {month}" in Claude Code
 6. Verify: Xero P&L now shows COGS and gross margin for the month
 ```
 
-This is the **key new workflow** that bridges Orbit → Xero directly. It's what makes gross margin real.
+This is the **key workflow** that bridges Orbit → Xero directly. It's what makes gross margin real.
+
+#### ROI Scorecard Update (Orbit + Xero → Sheets)
+```
+Trigger: Run as part of monthly close, after COGS allocation + reconciliation
+
+1. Pull Orbit lock-in hours for the month (by person × opportunity)
+2. Categorize hours into: Delivery / R&D / Sales / Content / Admin
+3. Pull Xero revenue actuals per client for the month
+4. Compute per-opportunity: hours, imputed cost, revenue, VPH, ROI multiple
+5. Compute blended VPH (all activities) and delivery-only VPH
+6. Compute imputed CAC: sales hours + content hours × rate
+7. Compute fully loaded CAC: cash CAC (from Xero 6000) + imputed time CAC
+8. Write to ROI Scorecard tab in Sheets
+9. Write memo lines to P&L CAC section (fully loaded CAC, per customer)
+```
+
+**This is how you close the loop between time allocation and financial return.** Every hour tracked in Orbit flows into a rate-of-return calculation.
 
 ### Phase 3: Supporting Workflows
 
@@ -438,17 +575,20 @@ This ensures zero downtime — the old model keeps working until the new one is 
 ### Priority 2: Sheets Alignment (Phase 1)
 8. **1c.** Audit IRR/LTV/Scorecard formulas FIRST (understand what will break)
 9. **1a.** Create new P&L tab mirroring Xero structure (parallel to old tab)
-10. Add Forecast + Actual column pairs per month
-11. Restructure Balance Sheet, Runway & KPIs
-12. **1b.** Update Apps Script to write to new structure
-13. Validate: run April reconciliation against both old and new tabs
-14. Cutover: swap tabs, update cross-references
+10. Add Forecast + Actual + Variance + Var% column groups per month
+11. **1a-ii.** Create CAC Tracker tab (deal log, monthly activity, rolling metrics, trend)
+12. **1d.** Restructure ROI Scorecard tab (VPH by opportunity, imputed time CAC, blended ROI)
+13. Restructure Balance Sheet, Runway & KPIs (add CAC metrics to KPIs)
+14. **1b.** Update Apps Script to write to new structure
+15. Validate: run April reconciliation against both old and new tabs
+16. Cutover: swap tabs, update cross-references
 
 ### Priority 3: Workflow Automation (Phase 2-3)
-15. Build COGS labor allocation workflow (Orbit hours → Xero journal)
-16. Build monthly reconciliation workflow (Xero → Sheets)
-17. Build invoice generation workflow (lock-ins → Xero DRAFT)
-18. Build cash pulse + expense audit workflows
+17. Build COGS labor allocation workflow (Orbit hours → Xero journal)
+18. Build monthly reconciliation workflow (Xero → Sheets, delta = $0)
+19. Build ROI Scorecard update workflow (Orbit hours + Xero revenue → VPH)
+20. Build invoice generation workflow (lock-ins → Xero DRAFT)
+21. Build cash pulse + expense audit workflows
 
 ### Priority 4: Cleanup (Phase 4)
 19. Fix CPL formula in `AllocationTable.tsx`
@@ -508,9 +648,11 @@ This ensures zero downtime — the old model keeps working until the new one is 
 - [ ] **Reconciliation delta = $0** — Xero monthly P&L net income matches Sheets Actual column net income, to the penny, for Apr'26
 - [ ] **Gross margin visible** — explicit gross margin % calculated from COGS each month (expected range: 55-65%)
 - [ ] **Net margin visible** — explicit net margin % after all OpEx + CAC each month
-- [ ] **CAC tracked separately** — community, content, social, outbound tools rolled up as Customer Acquisition Cost with a total line
+- [ ] **CAC tracked separately** — cash CAC from Xero + imputed time CAC from Orbit = fully loaded CAC visible on P&L and CAC Tracker
+- [ ] **Rate of return on time visible** — ROI Scorecard shows VPH and ROI multiple per opportunity, updated monthly from Orbit hours + Xero revenue
 - [ ] **Accrual-basis** — revenue recognized when earned, expenses when incurred, prepaid amortized monthly
 - [ ] **Every dollar accounted for** — no transactions in Xero that don't map to a Sheets row; no Sheets line items without a Xero account
+- [ ] **Every hour accounted for** — Orbit lock-in hours map to ROI Scorecard categories (delivery/R&D/sales/content/admin) with imputed cost and return
 
 ### Required
 - [ ] Professional Fees broken into Contract Labor + CAC + actual fees
