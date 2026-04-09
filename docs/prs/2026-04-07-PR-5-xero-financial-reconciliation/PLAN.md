@@ -93,6 +93,7 @@ Revenue → COGS → Gross Profit (margin %) → OpEx → Net Income (margin %)
 Reclassify $112,795 from Sale of Goods (4000) → Service Revenue (4100).
 - All current revenue is services (Dayforce consulting, Mystica retainer + profit share)
 - Future software revenue (Clarity Builder, PEPM) will use a new account when it materializes
+- **Method: Edit original invoices** in Xero to change account code from 4000 to 4100, rather than creating a reclassification journal. This keeps source documents correct and avoids contradictions between invoices and journals.
 
 #### 0c. Break Up Professional Fees ($97,400) + CAC Account Structure
 
@@ -103,7 +104,7 @@ Reclassify $112,795 from Sale of Goods (4000) → Service Revenue (4100).
 |------|------|----|------|
 | Robert & Jonathan 1099 comp | Professional Fees (6290) | Contract Labor (6090) | Then split COGS/OpEx per 0a |
 | QA contractor (ThirstySprout) | Professional Fees (6290) | COGS - Labor (5100) | 100% direct |
-| Social media (Contra/Benjamin) | Professional Fees (6290) | Advertising (6000) | → CAC: Content Production |
+| Social media $8K bank reimbursement | Professional Fees (6290) | Due to Director (820) | Partial repayment to Robert for TrueFrame. Not an expense — full $14,604.42 cost recorded via personal card journal to Advertising (6000). |
 | ACQ Community membership | Professional Fees (6290) | Advertising (6000) | → CAC: Community/Lead Gen |
 | Actual professional fees only | Stay in 6290 | Stay in 6290 | Legal, accounting, etc. |
 
