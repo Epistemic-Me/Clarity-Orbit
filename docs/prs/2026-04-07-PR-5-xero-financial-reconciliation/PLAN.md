@@ -94,14 +94,56 @@ Reclassify $112,795 from Sale of Goods (4000) → Service Revenue (4100).
 - All current revenue is services (Dayforce consulting, Mystica retainer + profit share)
 - Future software revenue (Clarity Builder, PEPM) will use a new account when it materializes
 
-#### 0c. Break Up Professional Fees ($97,400)
+#### 0c. Break Up Professional Fees ($97,400) + CAC Account Structure
 
+**Problem:** $97K in Professional Fees is a catch-all. Worse, customer acquisition spend is invisible — content, community, and outbound costs look like generic overhead instead of strategic investment. An investor (or the founders themselves) can't see margins or defend the allocation.
+
+**Reclassification:**
 | What | From | To | Code |
 |------|------|----|------|
 | Robert & Jonathan 1099 comp | Professional Fees (6290) | Contract Labor (6090) | Then split COGS/OpEx per 0a |
 | QA contractor (ThirstySprout) | Professional Fees (6290) | COGS - Labor (5100) | 100% direct |
-| Social media (Contra/Benjamin) | Professional Fees (6290) | Advertising (6000) | Marketing expense |
+| Social media (Contra/Benjamin) | Professional Fees (6290) | Advertising (6000) | → CAC: Content Production |
+| ACQ Community membership | Professional Fees (6290) | Advertising (6000) | → CAC: Community/Lead Gen |
 | Actual professional fees only | Stay in 6290 | Stay in 6290 | Legal, accounting, etc. |
+
+**CAC Sub-Account Structure in Xero:**
+
+All CAC items go to Advertising (6000) but use **tracking categories** or **description conventions** to sub-classify:
+
+| CAC Line Item | Xero Account | Description Tag | What It Is |
+|--------------|-------------|-----------------|------------|
+| Community Memberships | Advertising (6000) | `CAC:Community` | ACQ Community — lead gen network, warm introductions |
+| Content Production | Advertising (6000) | `CAC:Content` | Social media agency, video (Contra, HeyGen, Kite) |
+| Outbound Tools | Advertising (6000) | `CAC:Outbound` | Instantly, Apollo, Senja — cold outreach infra |
+| Other Marketing | Advertising (6000) | `CAC:Other` | Ascend Viral, ad spend, misc marketing |
+
+**CAC Metrics (tracked monthly in Sheets Runway & KPIs):**
+```
+Total CAC Spend ................. sum of all Advertising (6000)
+New Customers Acquired .......... count of new contracts signed
+CAC per Customer ................ Total CAC / Customers
+Content ROI ..................... Revenue attributable to content / Content spend
+CAC Trend ....................... month-over-month trajectory
+```
+
+**The Narrative (built into the P&L forecast):**
+
+The forecast should tell this story over 18 months:
+1. **Now (investment phase):** CAC is high ($2-5K/mo). Content flywheel is being built — podcast, blog, social. Community (ACQ) is warming leads. ROI is < 1x.
+2. **6 months (compounding phase):** SEO backlog compounds. Podcast episodes rank. Social following grows. Inbound leads increase. CAC spend stays flat but leads grow → CAC/customer drops.
+3. **12 months (flywheel phase):** Organic inbound dominates. Content produces more leads than outbound. CAC trends toward zero. Robert's personal brand drives negative CAC (content generates revenue via speaking, referrals, inbound that costs nothing marginal).
+
+**Each CAC line item should have a projected ROI and timeframe** so it reads as strategic investment, not cost drag:
+
+| Investment | Monthly Spend | Expected Mechanism | ROI Timeline |
+|-----------|--------------|-------------------|-------------|
+| ACQ Community ($3K/quarter) | $1K/mo | Warm intros → discovery calls → 35% close | 2.9x per quarter |
+| Content production | $0/mo (ended Mar'26) | SEO + social compound → inbound leads | Lagging — 3-6 months |
+| Outbound tools ($95/mo) | $95/mo | Cold email → meetings → pipeline | 1-3 month cycles |
+| Robert's time on content (Orbit: outer ring hours) | ~$2.25K/mo (15h × $150) | Brand building → authority → inbound | 6-12 months |
+
+**Note:** Robert's content hours are not a cash cost — they're an opportunity cost tracked in Orbit. But they should be visible in the CAC analysis as "hours diverted from billable work" so the investment is explicit.
 
 #### 0d. Journal Personal Card Expenses ($11,301)
 
@@ -118,10 +160,20 @@ Debit various expense accounts, Credit Due to Director (820):
 | Business Services, Legal, Tax, HR | Professional Fees | 6290 |
 | Internet, Coworking | Telephone and Internet | 6390 |
 
-#### 0e. Equity Reclassification
+#### 0e. Equity Reclassification — BLOCKED (pending legal)
 
-Journal: Debit Due to Director (820) $32,475 → Credit Additional Paid In Capital (3200) $32,475.
-Robert's capital injections are an equity purchase. After 0d, 820 will have $43,776; only the $32,475 moves to equity, $11,301 stays as director reimbursement.
+**Status: On hold.** Cannot reclassify $32,475 from Account 820 → APIC (3200) until founder equity split is formalized.
+
+**What's needed (one legal session, ~$1-2K):**
+1. Founder equity split (Robert + Jonathan, % and share count)
+2. Stock Purchase Agreement for Robert's $32,475 (retroactive to Aug-Oct 2025 injection dates)
+3. Vesting schedule decision (if any)
+4. Authorized share count confirmation
+5. Board consent resolution covering all of the above
+
+**Why blocked:** Moving money to equity without a stock purchase agreement creates worse audit risk than leaving it in 820. The journal entry is simple — Debit 820 $32,475, Credit APIC (3200) — but it must be backed by signed legal docs.
+
+**Impact on rest of plan:** None. All other Phase 0 items proceed independently. The $32,475 stays in Account 820 until legal paperwork is complete. After 0d (personal card journaling), 820 will show $43,776 ($32,475 capital + $11,301 reimbursement). Only the $32,475 moves to equity once docs are signed.
 
 #### 0f. Accrual Adjustments
 
@@ -379,7 +431,7 @@ This ensures zero downtime — the old model keeps working until the new one is 
 2. **0b.** Revenue reclassification (Sale of Goods → Service Revenue)
 3. **0c.** Break up Professional Fees → Contract Labor + Advertising
 4. **0d.** Journal personal card expenses ($11,301) → Account 820
-5. **0e.** Equity reclassification ($32,475) → APIC (3200)
+5. **0e.** Equity reclassification ($32,475) → APIC (3200) — **BLOCKED: needs founder equity split + stock purchase agreement from lawyer**
 6. **0f.** Accrual adjustments (prepaid amortization, expense matching)
 7. **0g.** Create missing contacts (Relationship Psychics, Intapp)
 
@@ -463,7 +515,7 @@ This ensures zero downtime — the old model keeps working until the new one is 
 ### Required
 - [ ] Professional Fees broken into Contract Labor + CAC + actual fees
 - [ ] Personal card expenses ($11,301) journaled to correct accounts
-- [ ] Equity ($32,475) reclassified to APIC (3200)
+- [ ] Equity ($32,475) reclassified to APIC (3200) — **blocked on legal: founder equity split + stock purchase agreement**
 - [ ] Sheets P&L structure matches Xero chart of accounts (same codes, same line items)
 - [ ] IRR/LTV/Scorecard tabs updated and validated against new P&L structure
 - [ ] Apps Script updated to write Orbit data to new Sheets structure
