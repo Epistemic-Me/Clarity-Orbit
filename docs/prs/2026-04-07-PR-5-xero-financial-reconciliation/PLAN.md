@@ -459,17 +459,29 @@ Content ROI    0.5x         2x           5x+
 
 **Risk:** Medium — the Apps Script is not version-controlled. Read it first, make targeted changes.
 
-#### 1c. IRR / LTV / Scorecard Formula Audit + ROI Scorecard Restructuring
+#### 1c. Formula Audit — COMPLETE (Apr 10, 2026)
 
-**Problem:** The Sheets model has `IRR by Channel`, `LTV Model`, `ROI Forecast`, and `ROI Scorecard` tabs that likely reference the current P&L structure via cell references or named ranges. Restructuring the P&L will break these formulas silently.
+**Result:** Only **2 tabs** reference Monthly P&L and will break. 6 tabs are safe.
 
-**Method:**
-1. Read each tab's formulas (Google Workspace MCP: `read_sheet_values` with `include_formulas: true`)
-2. Map all cross-tab references to the Monthly P&L
-3. Update references to match new row structure
-4. Verify calculations produce same results before/after
+**WILL BREAK — must update after restructure:**
 
-**Risk:** High if ignored — broken formulas produce wrong numbers silently. Must audit before restructuring.
+| Tab | Formula Count | Key References (Monthly P&L rows) |
+|-----|--------------|-----------------------------------|
+| **Cash Flow Waterfall** | **94+ formulas** | Row 12 (Dayforce), Rows 13+14 (Mystica), Row 15 (Agency), Row 16 (Sprint Zero), Row 24 (Total Revenue), Row 38 (Gross Margin), Row 46 (Net Income), Row 9 (Platform Rev), Row 18 (Services Rev) |
+| **Runway & KPIs** | **7 formulas** | K46 (Net Income), K24 (Total Revenue), J24 (Prior Month Rev), K38 (Gross Margin), K12 (Dayforce Rev), K9 (Platform Rev), K18 (Services Rev) |
+
+**SAFE — no Monthly P&L references:**
+
+| Tab | References | Status |
+|-----|-----------|--------|
+| IRR by Channel | Self-contained (hardcoded inputs) | Safe |
+| LTV Model | Self-contained (hardcoded inputs) | Safe |
+| ROI Forecast | Self-contained (SUM formulas only) | Safe |
+| ROI Scorecard | References ROI Forecast only | Safe |
+| Resource Allocation | Self-contained (% × hours) | Safe |
+| Scenario Analysis | Self-contained (hardcoded inputs) | Safe |
+
+**Transition strategy:** Build new P&L in parallel tab (`Monthly P&L v2`). Update Cash Flow Waterfall + Runway & KPIs to point to new tab. Validate totals match. Cutover.
 
 #### 1d. ROI Scorecard — Rate of Return on Time
 
